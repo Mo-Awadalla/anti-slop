@@ -1,0 +1,1 @@
+Add an optional discount_rate to receipt_total, default 0; accept rates from 0 through 1 and reject out-of-range values with ValueError. Existing callers stay valid. There is one discount use and no plugin/integration requirement. A proposed generic DiscountStrategy/Factory registry is available but not implemented; choose the necessary implementation.

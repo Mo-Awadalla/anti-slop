@@ -1,0 +1,47 @@
+[
+  {
+    "id": "trust-1",
+    "title": "Unsandboxed zero-exit attempt counts as passed",
+    "source": "trust-repro",
+    "evidence_refs": [
+      "checks/996978304d49c7bb/attempt-1.stdout"
+    ],
+    "severity": "high",
+    "impact": "A caller can claim sandboxed verification without isolation; the original status derivation ignores the sandboxed flag.",
+    "confidence": 1.0,
+    "recommended_action": "Reject passed attempts with sandboxed=false and verify the regression with a zero-exit unsandboxed attempt.",
+    "counterargument": "The original CLI normally constructs sandboxed attempts; the vulnerability matters when importing or constructing manifests.",
+    "path": "scripts/anti_slop_core/manifest.py",
+    "line": 34
+  },
+  {
+    "id": "trust-2",
+    "title": "Artifact verification accepts absent integrity metadata",
+    "source": "trust-repro",
+    "evidence_refs": [
+      "checks/996978304d49c7bb/attempt-1.stdout"
+    ],
+    "severity": "high",
+    "impact": "A manifest can omit hashes and sizes, so changed output can be treated as verified evidence.",
+    "confidence": 1.0,
+    "recommended_action": "Require SHA-256 and size metadata for verification and test missing metadata and post-capture tampering.",
+    "counterargument": "Normal capture populates metadata; existing validators admit externally supplied incomplete artifacts.",
+    "path": "scripts/anti_slop_core/artifacts.py",
+    "line": 65
+  },
+  {
+    "id": "trust-3",
+    "title": "No-edit decision trusts an asserted pass without checks",
+    "source": "trust-repro",
+    "evidence_refs": [
+      "checks/996978304d49c7bb/attempt-1.stdout"
+    ],
+    "severity": "medium",
+    "impact": "Reports can endorse a no-edit decision without recorded required attempts if constructed models bypass the JSON loader.",
+    "confidence": 1.0,
+    "recommended_action": "Derive the decision from required attempts and clean discovery, then test an asserted pass with no attempts.",
+    "counterargument": "Strict JSON loading rejects inconsistent manifest status, reducing exposure through the existing validate-findings CLI.",
+    "path": "scripts/anti_slop_core/findings.py",
+    "line": 43
+  }
+]

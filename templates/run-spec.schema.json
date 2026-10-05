@@ -1,35 +1,302 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://hermes.local/anti-slop/run-spec.schema.json",
-  "title": "Anti-Slop P0 Run Specification",
-  "description": "A read-only diagnose run. Runtime validation additionally verifies that check cwd values stay within snapshot_root and that argv contains no shell form.",
+  "title": "Anti-Slop Run Specification",
+  "description": "Explicit checks for diagnose, or finite supplied preserve-behavior text edits on a disposable snapshot. Runtime also rejects shells, path traversal, protected config surfaces, stale hashes, weak/missing evidence and check mutations; enforces scope and cumulative budgets; requires a green baseline and immutable declared oracles.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["repo_path", "snapshot_root", "mode", "checks"],
+  "required": [
+    "repo_path",
+    "snapshot_root",
+    "mode",
+    "checks"
+  ],
   "properties": {
-    "repo_path": {"type": "string", "minLength": 1, "pattern": "^/"},
-    "snapshot_root": {"type": "string", "minLength": 1, "pattern": "^/"},
-    "mode": {"const": "diagnose"},
+    "repo_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^/"
+    },
+    "snapshot_root": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^/"
+    },
+    "mode": {
+      "enum": [
+        "diagnose",
+        "refactor",
+        "repair-slop"
+      ]
+    },
     "checks": {
       "type": "array",
-      "items": {"$ref": "#/$defs/checkSpec"}
+      "items": {
+        "$ref": "#/$defs/checkSpec"
+      }
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 1
+    },
+    "behavior_budget": {
+      "const": "preserve"
+    },
+    "allowed_paths": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*[\\\\\\s\\u0000-\\u001f\\u007f]).+$"
+      }
+    },
+    "oracle_checks": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "oracle_paths": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*[\\\\\\s\\u0000-\\u001f\\u007f]).+$"
+      }
+    },
+    "protected_paths": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*[\\\\\\s\\u0000-\\u001f\\u007f]).+$"
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_files",
+        "max_changed_lines",
+        "max_steps"
+      ],
+      "properties": {
+        "max_files": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_changed_lines": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_steps": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/patchStep"
+      }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "diagnose"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "objective"
+              ]
+            },
+            {
+              "required": [
+                "behavior_budget"
+              ]
+            },
+            {
+              "required": [
+                "allowed_paths"
+              ]
+            },
+            {
+              "required": [
+                "oracle_checks"
+              ]
+            },
+            {
+              "required": [
+                "oracle_paths"
+              ]
+            },
+            {
+              "required": [
+                "limits"
+              ]
+            },
+            {
+              "required": [
+                "steps"
+              ]
+            },
+            {
+              "required": [
+                "protected_paths"
+              ]
+            }
+          ]
+        }
+      },
+      "else": {
+        "required": [
+          "objective",
+          "behavior_budget",
+          "allowed_paths",
+          "oracle_checks",
+          "oracle_paths",
+          "limits",
+          "steps"
+        ],
+        "properties": {
+          "checks": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "checkSpec": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "argv"],
+      "required": [
+        "id",
+        "argv"
+      ],
       "properties": {
-        "id": {"type": "string", "minLength": 1},
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
         "argv": {
           "type": "array",
           "minItems": 1,
-          "items": {"type": "string", "minLength": 1}
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "cwd": {"type": "string", "minLength": 1, "default": "."},
-        "shell": {"const": false, "default": false},
-        "timeout_seconds": {"type": ["number", "null"], "minimum": 0}
+        "cwd": {
+          "type": "string",
+          "minLength": 1,
+          "default": "."
+        },
+        "shell": {
+          "const": false,
+          "default": false
+        },
+        "timeout_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "required": {
+          "type": "boolean",
+          "default": true
+        },
+        "rerun": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "patchChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "before_sha256",
+        "content"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*[\\\\\\s\\u0000-\\u001f\\u007f]).+$"
+        },
+        "before_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "content": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "not": {
+        "properties": {
+          "before_sha256": {
+            "type": "null"
+          },
+          "content": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "before_sha256",
+          "content"
+        ]
+      }
+    },
+    "patchStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "description",
+        "changes"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "changes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/patchChange"
+          }
+        }
       }
     }
   }

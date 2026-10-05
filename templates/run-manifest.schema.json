@@ -1,76 +1,353 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://hermes.local/anti-slop/run-manifest.schema.json",
-  "title": "Anti-Slop P0 Run Manifest",
-  "description": "The data contract for a diagnose manifest. P0 defines and validates this shape but does not derive, write, or execute manifests.",
+  "title": "Anti-Slop Evidence Manifest",
+  "description": "Runtime derives statuses from sandboxed attempts and verifies every declared artifact. Write passes additionally require linked, verified write/evidence.json and write/final.patch artifacts. Schema validation alone cannot establish evidence integrity.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["run_id", "mode", "repo_path", "snapshot_root", "status"],
+  "required": [
+    "run_id",
+    "mode",
+    "repo_path",
+    "snapshot_root",
+    "status"
+  ],
   "properties": {
-    "run_id": {"type": "string", "minLength": 1},
-    "mode": {"const": "diagnose"},
-    "repo_path": {"type": "string", "minLength": 1, "pattern": "^/"},
-    "snapshot_root": {"type": "string", "minLength": 1, "pattern": "^/"},
-    "status": {"enum": ["passed", "stopped", "blocked", "rolled_back"]},
-    "checks": {"type": "array", "items": {"$ref": "#/$defs/checkRecord"}},
-    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
-    "artifacts": {"type": "array", "items": {"$ref": "#/$defs/artifactRef"}}
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mode": {
+      "enum": [
+        "diagnose",
+        "refactor",
+        "repair-slop"
+      ]
+    },
+    "repo_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^/"
+    },
+    "snapshot_root": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^/"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "stopped",
+        "blocked",
+        "failed",
+        "flaky",
+        "rolled_back"
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/checkRecord"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/artifactRef"
+      }
+    },
+    "discovery": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/discovery"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "stop_reason": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    }
   },
   "$defs": {
     "artifactRef": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path"],
+      "required": [
+        "path",
+        "sha256",
+        "size_bytes"
+      ],
       "properties": {
-        "path": {"type": "string", "minLength": 1},
-        "sha256": {"type": ["string", "null"], "minLength": 1},
-        "size_bytes": {"type": ["integer", "null"], "minimum": 0},
-        "media_type": {"type": ["string", "null"], "minLength": 1}
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*[\\\\\\s\\u0000-\\u001f\\u007f]).+$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "media_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
       }
     },
     "commandAttempt": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["check_id", "argv", "cwd", "status"],
+      "required": [
+        "check_id",
+        "argv",
+        "cwd",
+        "status"
+      ],
       "properties": {
-        "check_id": {"type": "string", "minLength": 1},
-        "argv": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
-        "cwd": {"type": "string", "minLength": 1},
-        "status": {"enum": ["pending", "running", "passed", "failed", "skipped", "blocked", "not-run"]},
-        "exit_code": {"type": ["integer", "null"]},
-        "duration_ms": {"type": ["number", "null"], "minimum": 0},
-        "stdout_artifact": {"anyOf": [{"$ref": "#/$defs/artifactRef"}, {"type": "null"}]},
-        "stderr_artifact": {"anyOf": [{"$ref": "#/$defs/artifactRef"}, {"type": "null"}]}
+        "check_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "cwd": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "running",
+            "passed",
+            "failed",
+            "skipped",
+            "blocked",
+            "unavailable",
+            "not-run"
+          ]
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "duration_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "stdout_artifact": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/artifactRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stderr_artifact": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/artifactRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sandboxed": {
+          "type": "boolean",
+          "default": true
+        }
       }
     },
     "checkRecord": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["check_id", "status"],
+      "required": [
+        "check_id",
+        "status"
+      ],
       "properties": {
-        "check_id": {"type": "string", "minLength": 1},
-        "status": {"enum": ["pending", "passed", "failed", "skipped", "blocked", "not-run"]},
-        "attempts": {"type": "array", "items": {"$ref": "#/$defs/commandAttempt"}},
-        "finding_ids": {"type": "array", "items": {"type": "string", "minLength": 1}}
+        "check_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "passed",
+            "failed",
+            "skipped",
+            "blocked",
+            "unavailable",
+            "flaky",
+            "not-run"
+          ]
+        },
+        "required": {
+          "type": "boolean",
+          "default": true
+        },
+        "attempts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/commandAttempt"
+          }
+        },
+        "finding_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       }
     },
     "finding": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "check_id", "severity", "message"],
+      "required": [
+        "id",
+        "title",
+        "source",
+        "evidence_refs",
+        "severity",
+        "impact",
+        "confidence",
+        "recommended_action",
+        "counterargument"
+      ],
       "properties": {
-        "id": {"type": "string", "minLength": 1},
-        "check_id": {"type": "string", "minLength": 1},
-        "severity": {"enum": ["info", "low", "medium", "high", "critical"]},
-        "message": {"type": "string", "minLength": 1},
-        "evidence": {"type": "array", "items": {"type": "string", "minLength": 1}},
-        "impact": {"type": ["string", "null"]},
-        "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
-        "recommended_action": {"type": ["string", "null"]},
-        "counterargument": {"type": ["string", "null"]},
-        "path": {"type": ["string", "null"]},
-        "line": {"type": ["integer", "null"], "minimum": 1},
-        "column": {"type": ["integer", "null"], "minimum": 1}
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "impact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "recommended_action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "counterargument": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "line": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "column": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      }
+    },
+    "discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "git_root",
+        "head",
+        "branch",
+        "dirty"
+      ],
+      "properties": {
+        "git_root": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^/"
+        },
+        "head": {
+          "type": "string",
+          "minLength": 1
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dirty": {
+          "type": "boolean"
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       }
     }
   }

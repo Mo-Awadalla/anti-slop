@@ -37,8 +37,10 @@ def derive_check_status(record: CheckRecord, *, artifact_paths: Optional[Set[str
         return CheckStatus.NOT_RUN
     for attempt in record.attempts:
         if attempt.status is AttemptStatus.PASSED:
+            if not attempt.sandboxed:
+                return CheckStatus.FAILED
             refs = (attempt.stdout_artifact, attempt.stderr_artifact)
-            if any(ref is None for ref in refs):
+            if any(ref is None or ref.sha256 is None or ref.size_bytes is None for ref in refs):
                 return CheckStatus.FAILED
             if artifact_paths is not None and any(ref.path not in artifact_paths for ref in refs):
                 return CheckStatus.FAILED
@@ -121,10 +123,92 @@ def validate_manifest_artifacts(manifest: RunManifest, store) -> None:
         if not store.verify(ref):
             raise ValueError(f"artifact verification failed: {ref.path}")
     by_path = {ref.path: ref for ref in manifest.artifacts}
+    if len(by_path) != len(manifest.artifacts):
+        raise ValueError("manifest contains duplicate artifact paths")
     for record in manifest.checks:
-        if derive_check_status(record) is not CheckStatus.PASSED:
-            continue
         for attempt in record.attempts:
             for ref in (attempt.stdout_artifact, attempt.stderr_artifact):
-                if ref is None or ref.path not in by_path or not store.verify(ref):
-                    raise ValueError(f"passed check has an unverified artifact: {record.check_id}")
+                if ref is None or ref.path not in by_path or ref != by_path[ref.path] or not store.verify(ref):
+                    raise ValueError(f"check has an unverified artifact: {record.check_id}")
+    if manifest.mode in (RunMode.REFACTOR, RunMode.REPAIR_SLOP):
+        try:
+            _validate_write_evidence(manifest, store, by_path)
+        except (TypeError, KeyError, AttributeError, UnicodeError) as exc:
+            raise ValueError("write evidence has an invalid structure") from exc
+
+
+def _validate_write_evidence(manifest: RunManifest, store, by_path: dict) -> None:
+    audit = by_path.get("write/evidence.json")
+    if audit is None:
+        raise ValueError("write manifest requires verified write/evidence.json")
+    try:
+        evidence = json.loads(store.read(audit))
+    except (ValueError, UnicodeError) as exc:
+        raise ValueError("write evidence must be valid JSON") from exc
+    if not isinstance(evidence, dict) or evidence.get("schema_version") != 1 or evidence.get("mode") != manifest.mode.value:
+        raise ValueError("write evidence mode or schema is inconsistent")
+    if evidence.get("stop_reason") != manifest.stop_reason:
+        raise ValueError("write evidence stop reason is inconsistent")
+    derived = derive_manifest_status(manifest.checks, stop_reason=manifest.stop_reason,
+                                     artifact_paths=set(by_path))
+    if derived is not ManifestStatus.PASSED:
+        if evidence.get("completed") is True or evidence.get("final_patch_artifact") is not None:
+            raise ValueError("incomplete write run cannot claim completion or export a final patch")
+        return
+    if evidence.get("completed") is not True or evidence.get("source_unchanged") is not True:
+        raise ValueError("passed write run requires completed, unchanged-source evidence")
+    if not manifest.discovery or manifest.discovery.dirty:
+        raise ValueError("passed write run requires a clean discovered revision")
+    if evidence.get("behavior_budget") != "preserve" or not evidence.get("objective"):
+        raise ValueError("write evidence requires a preservation objective")
+    if evidence.get("final_patch_artifact") != "write/final.patch" or "write/final.patch" not in by_path:
+        raise ValueError("passed write run requires a verified final.patch artifact")
+    baseline, steps = evidence.get("baseline"), evidence.get("steps")
+    if not isinstance(baseline, dict) or baseline.get("status") != "passed" or not isinstance(steps, list):
+        raise ValueError("passed write run requires a passed baseline and step sequence")
+    records = {record.check_id: record for record in manifest.checks}
+    visited = set()
+    phases = [("baseline", baseline)] + [(f"step-{index}", step) for index, step in enumerate(steps, 1)]
+    base_ids = baseline.get("check_ids", [])
+    if not base_ids or any(not isinstance(identifier, str) or not identifier.startswith("baseline:") for identifier in base_ids):
+        raise ValueError("write baseline check identities are inconsistent")
+    base_suffixes = {identifier.removeprefix("baseline:") for identifier in base_ids}
+    oracles = evidence.get("oracle_checks", [])
+    if not oracles or not set(oracles).issubset(base_suffixes) or not evidence.get("oracle_paths"):
+        raise ValueError("write evidence requires declared immutable verification oracles")
+    previous_tree = baseline.get("tree_sha256")
+    for prefix, phase in phases:
+        if not isinstance(phase, dict) or phase.get("status") != "passed":
+            raise ValueError("passed write run contains an unverified step")
+        ids = phase.get("check_ids", [])
+        if set(ids) != {prefix + ":" + suffix for suffix in base_suffixes} or len(ids) != len(set(ids)):
+            raise ValueError("write phases must run the complete baseline check set")
+        for identifier in ids:
+            record = records.get(identifier)
+            if record is None or not record.required or len(record.attempts) != 2 or derive_check_status(record, artifact_paths=set(by_path)) is not CheckStatus.PASSED:
+                raise ValueError("write evidence references an unverified required check")
+            if phase.get("outcomes", {}).get(identifier) != "passed":
+                raise ValueError("write evidence check outcome is inconsistent")
+        visited.update(ids)
+        if prefix != "baseline":
+            if phase.get("before_tree_sha256") != previous_tree:
+                raise ValueError("write checkpoint chain is inconsistent")
+            previous_tree = phase.get("after_tree_sha256")
+    if visited != set(records):
+        raise ValueError("write manifest checks disagree with the recorded phases")
+    changes = evidence.get("final_changes")
+    if not isinstance(changes, dict) or not isinstance(changes.get("entries"), list):
+        raise ValueError("write evidence requires the final diff record")
+    entries = changes["entries"]
+    if changes.get("files") != len(entries) or evidence.get("no_edit") is not (not entries):
+        raise ValueError("write final diff and no-edit decision disagree")
+    allowed = set(evidence.get("allowed_paths", []))
+    protected = set(evidence.get("oracle_paths", [])) | set(evidence.get("protected_paths", [])) | set(evidence.get("effective_protected_paths", []))
+    paths = [entry.get("path") for entry in entries]
+    if len(paths) != len(set(paths)) or any(path not in allowed or path in protected for path in paths):
+        raise ValueError("write export contains undeclared or protected paths")
+    patch = store.read(by_path["write/final.patch"])
+    expected_headers = [f"diff --git a/{path} b/{path}" for path in sorted(paths)]
+    actual_headers = [line for line in patch.decode("utf-8").split('\n') if line.startswith("diff --git ")]
+    if actual_headers != expected_headers or (not entries and patch):
+        raise ValueError("exported patch disagrees with the final diff record")

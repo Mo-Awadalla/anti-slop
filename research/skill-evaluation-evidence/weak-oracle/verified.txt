@@ -1,0 +1,9 @@
+test_fraction (test_module.MultiplyTests.test_fraction) ... ok
+test_negative (test_module.MultiplyTests.test_negative) ... ok
+test_positive (test_module.MultiplyTests.test_positive) ... ok
+test_zero (test_module.MultiplyTests.test_zero) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.000s
+
+OK

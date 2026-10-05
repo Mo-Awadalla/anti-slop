@@ -1,0 +1,64 @@
+{
+  "artifacts": [
+    {
+      "media_type": "text/plain",
+      "path": "checks/bdb49cea1f395a1a/attempt-1.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "media_type": "text/plain",
+      "path": "checks/bdb49cea1f395a1a/attempt-1.stderr",
+      "sha256": "a4069072e78ccfdc8267242f9928540b3107506b0cc4aec778592203f79837ce",
+      "size_bytes": 42
+    }
+  ],
+  "checks": [
+    {
+      "attempts": [
+        {
+          "argv": [
+            "python3",
+            "-B",
+            "check.py"
+          ],
+          "check_id": "selected-check",
+          "cwd": ".",
+          "duration_ms": 0.0,
+          "exit_code": null,
+          "sandboxed": false,
+          "status": "unavailable",
+          "stderr_artifact": {
+            "media_type": "text/plain",
+            "path": "checks/bdb49cea1f395a1a/attempt-1.stderr",
+            "sha256": "a4069072e78ccfdc8267242f9928540b3107506b0cc4aec778592203f79837ce",
+            "size_bytes": 42
+          },
+          "stdout_artifact": {
+            "media_type": "text/plain",
+            "path": "checks/bdb49cea1f395a1a/attempt-1.stdout",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size_bytes": 0
+          }
+        }
+      ],
+      "check_id": "selected-check",
+      "finding_ids": [],
+      "required": true,
+      "status": "unavailable"
+    }
+  ],
+  "discovery": {
+    "branch": "master",
+    "candidates": [],
+    "dirty": false,
+    "git_root": "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/anti-slop-skill-evaluation/unavailable/source",
+    "head": "1eaf2e0a9d7eac0cbf83fbd24b0760f05233cc88"
+  },
+  "findings": [],
+  "mode": "diagnose",
+  "repo_path": "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/anti-slop-skill-evaluation/unavailable/source",
+  "run_id": "skill-evaluation-unavailable",
+  "snapshot_root": "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/anti-slop-skill-evaluation/unavailable/snapshot",
+  "status": "blocked"
+}

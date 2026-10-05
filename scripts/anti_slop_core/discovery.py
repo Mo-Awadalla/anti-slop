@@ -7,6 +7,7 @@ import os
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 from pathlib import Path
 from typing import Iterable
@@ -28,7 +29,7 @@ _DOC_NAMES = {"readme", "readme.md", "readme.rst", "makefile", "tox.ini", "pypro
 
 def _git(repo: Path, *args: str) -> str:
     try:
-        result = subprocess.run(["git", "-C", str(repo), *args], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=False)
+        result = subprocess.run(["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-C", str(repo), *args], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=False)
     except (OSError, subprocess.CalledProcessError) as exc:
         detail = getattr(exc, "stderr", "") or str(exc)
         raise DiscoveryError(f"git discovery failed: {detail.strip()}") from exc
@@ -40,6 +41,8 @@ def _candidate_files(root: Path) -> Iterable[Path]:
         dirs[:] = [d for d in dirs if d != ".git"]
         for name in files:
             path = Path(current) / name
+            if path.is_symlink():
+                continue
             lower = name.lower()
             rel = path.relative_to(root).as_posix().lower()
             if lower in _DOC_NAMES or "/.github/workflows/" in f"/{rel}/" or "/.gitlab-ci" in f"/{rel}/" or (lower.endswith((".yml", ".yaml")) and ("ci" in rel or "workflow" in rel)):
@@ -83,18 +86,32 @@ def discover(repo_path: str | Path) -> DiscoveryInfo:
 def source_fingerprint(root: str | Path) -> str:
     root_path = Path(root).resolve()
     digest = hashlib.sha256()
+    digest.update((root_path.stat().st_mode & 0o7777).to_bytes(4, "big"))
+    if (root_path / ".git").exists():
+        digest.update(_git(root_path, "rev-parse", "HEAD").encode())
+        digest.update(_git(root_path, "rev-parse", "--abbrev-ref", "HEAD").encode())
+        digest.update(_git(root_path, "status", "--porcelain=v1", "--untracked-files=all").encode())
     entries: list[Path] = []
     for current, dirs, files in os.walk(root_path, followlinks=False):
         dirs[:] = [d for d in dirs if d != ".git"]
+        for name in dirs:
+            if (Path(current) / name).is_symlink():
+                raise DiscoveryError(f"symlink source is not allowed: {Path(current) / name}")
+            entries.append(Path(current) / name)
         for name in files:
             path = Path(current) / name
             if path.is_symlink():
                 raise DiscoveryError(f"symlink source is not allowed: {path}")
+            if not stat.S_ISREG(path.stat().st_mode):
+                raise DiscoveryError(f"nonregular source content is not allowed: {path}")
             entries.append(path)
     for path in sorted(entries):
         rel = path.relative_to(root_path).as_posix().encode()
-        data = path.read_bytes()
+        directory = path.is_dir()
+        data = b"" if directory else path.read_bytes()
         digest.update(len(rel).to_bytes(8, "big")); digest.update(rel)
+        digest.update(b"D" if directory else b"F")
+        digest.update((path.stat().st_mode & 0o7777).to_bytes(4, "big"))
         digest.update(len(data).to_bytes(8, "big")); digest.update(data)
     return digest.hexdigest()
 

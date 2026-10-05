@@ -1,0 +1,1 @@
+Fix can_read so only an authenticated owner may read. The tests already express intended behavior and currently fail. This request authorizes the repair in this fixture; preserve unrelated title behavior.

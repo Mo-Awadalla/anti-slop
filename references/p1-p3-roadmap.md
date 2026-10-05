@@ -1,27 +1,21 @@
-# Anti-Slop: Remaining Work
+# Anti-Slop: Phase Completion
 
-This replaces the stale P1–P3 sequence. The current implementation already has the read-only diagnosis runner, explicit-check execution, evidence artifacts, manifest handling, and sandboxing. Do not rebuild those as the next milestone.
+The earlier P0 runner already provided diagnosis, artifact capture, sandboxing, and findings validation. The remaining roadmap focused on making the skill useful, piloting it, and adding bounded code-changing execution. These phases are now implemented.
 
-## Next: refocus the agent workflow
+| Phase | Delivered | Evidence |
+| --- | --- | --- |
+| P1 — Agent workflow | Prevention, contextual diagnosis, refactor and repair routing; independent verification; scoped recovery; concise entrypoint and conditional references written using Matt's skill-writing guidance | [SKILL.md](../SKILL.md), [agent workflow](agent-workflow.md), [qualitative evaluation](../research/skill-evaluation.md) |
+| P2 — Pilot and friction | Read-only diagnosis of upstream anti-slop, three reproduced trust defects with counterarguments and verified capture provenance; source unchanged | [Pilot results](../research/pilot-results.md) and recorded captures |
+| P3 — Supplied changes and recovery | Executable refactor and repair-slop snapshot modes; declared objective/oracles/bounds; baseline and per-step checks; rollback; patch export; strict CLI/spec/manifest contracts | [Operating contract](operating-contract.md), [acceptance results](../research/acceptance-results.md) |
 
-The runner is supporting infrastructure. Rework `SKILL.md` so the main product is an agent workflow for contextual code-quality judgment during implementation and review:
+The pilot supported keeping the runner optional. No reusable check profiles or extra fast-path machinery were added: the agent workflow already works without a run spec, and one pilot does not establish that profiles save enough effort to justify their maintenance.
 
-- inspect project intent and local conventions before judging;
-- distinguish style preference from demonstrated maintenance, verification, behavior, or security cost;
-- connect each finding to evidence, impact, confidence, and a counterargument;
-- give concise, concrete prevention and remediation guidance without asserting that every cleanup is worthwhile;
-- preserve the user's requested behavior and project constraints.
+## Completion boundaries
 
-Keep the workflow useful even when the runner is unavailable or unnecessary. Do not add more machinery before this refocus is clear.
+The direct agent workflow covers intentional defect repair and preservation. The deterministic runner's two write modes both require a green baseline and preserve behavior; they edit only supplied text in a disposable snapshot, not the source checkout. The runner does not generate findings/edits, establish assertion independence automatically, or certify semantic equivalence. This is a deliberate implemented boundary, not an unimplemented command placeholder.
 
-## Then: pilot and reduce friction
+Preserved blueprint proposals for language-specific codemods, automated metrics, external scan adapters, signed evidence, and red-to-green runner repair are extensions, not shipped claims. Generic explicit checks can invoke available project tools inside the sandbox, subject to its runtime/network limits.
 
-Run the read-only workflow on a small number of real repositories with the user's selected checks. Evaluate whether findings are useful, false positives are controlled, and the process takes an acceptable amount of time. Update the workflow from observed results.
+## Empirical questions
 
-Consider a fast path or reusable repository check profiles only if the pilot demonstrates that they save user effort without weakening evidence or scope control.
-
-## Later: code-changing modes
-
-There is no `refactor` or `repair-slop` implementation. Treat behavior-preserving refactoring and authorized repair as separate future designs. Before exposing a write mode, define its scope, explicit authorization, recovery/checkpoint behavior, verification oracle, stop conditions, and end-to-end acceptance cases. Keep “no edit” as a valid outcome.
-
-Do not add a command placeholder for a future mode. Do not make diagnosis automatically mutate the target repository.
+Local tests, real Bubblewrap CLI runs, one upstream pilot, and qualitative skill scenarios establish concrete execution behavior and useful decisions. They do not establish a general improvement in maintainability, hidden regression rate, review time, or agent outcomes. A paired corpus study with clean controls and independent outcome measurement is required for those claims. Missing research reports remain documented in the research index.

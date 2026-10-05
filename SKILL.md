@@ -1,11 +1,11 @@
 ---
 name: anti-slop
-description: Use when applying the evidence-first anti-slop workflow to diagnose repository risks or validate supplied findings without editing the target repository.
-version: 1.1.0
-author: Mohamed
+description: Prevent code slop; diagnose, refactor, repair with evidence.
 license: MIT
-platforms: [linux]
 metadata:
+  version: 2.0.0
+  author: Mohamed
+  runner_platforms: [linux]
   hermes:
     tags: [software-development, code-quality, anti-slop]
     related_skills: []
@@ -13,89 +13,57 @@ metadata:
 
 # Anti-Slop
 
-## Overview
+Reduce the cost of understanding, testing, changing, or operating code when that cost has no demonstrated benefit. Judge against project intent and contracts. AI provenance, personal taste, a long function, or a tool warning alone is not a defect.
 
-This user-local skill provides a controlled, evidence-first workflow for diagnosing inefficient, unreadable, difficult-to-test, or unsafe code. P0 is read-only with respect to the target repository. It separates mechanical evidence capture from contextual judgment and does not turn taste into fact.
+The agent workflow is the main product and works with ordinary repository tools. The optional Linux runner captures reproducible, sandboxed evidence.
 
-## When to use
+## Choose the work
 
-Use this skill when the request asks whether code is unnecessarily complex, hard to test, risky to maintain, or otherwise “sloppy,” and the answer should be grounded in the actual repository.
+Use the user's request to select the mode and scope:
 
-Do not use it as a universal style checker, a replacement for project-specific instructions, or permission to edit code. P0 does not support automatic refactoring or repair.
+- **Prevent:** implement the requested behavior using existing boundaries, avoiding speculative layers, invented integrations, weak tests, and unrelated churn.
+- **Diagnose:** inspect without editing; explain actionable risks and the next useful step.
+- **Refactor:** remove a concrete structural cost while preserving observable behavior.
+- **Repair:** fix an evidenced defect or verification gap; record intentional behavior changes against the requested contract.
 
-## P0 Boundary
+Read [agent-workflow.md](references/agent-workflow.md) for prevention or code-changing work, including characterization and recovery. Read [evidence-baseline.md](references/evidence-baseline.md) before judging a signal or making a verification claim. Read [operating-contract.md](references/operating-contract.md) when using or extending the runner.
 
-The P0 CLI exposes exactly two subcommands:
+## Establish context
 
-- `diagnose --spec PATH`
-- `validate-findings --manifest PATH --findings PATH`
+Inspect project instructions, relevant callers and tests, and current working changes. Identify the required outputs, errors, side effects, ordering, permissions, persistence, and public interfaces. Preserve unrelated user work; choose an isolated checkout when needed.
 
-`refactor` and `repair-slop` are intentionally not exposed. Diagnosis captures Git ground truth, creates a detached snapshot, runs explicitly supplied checks inside Bubblewrap, records stdout/stderr artifacts with SHA-256 and size metadata, derives manifest status, and renders a Markdown report. Unsupported ecosystems receive generic reduced-capability reporting rather than guessed language-specific findings.
+Select relevant checks from project configuration, CI, and documentation and record actual baseline results. Discovered commands are candidates; deliberately choose exact commands and an appropriate execution environment.
 
-P0 does not mutate the source repository, generate subjective style findings, or claim a passed run when required checks are unavailable, blocked, flaky, failed, or unverified.
+Continue when the target, behavior contract, existing changes, verification oracle, and baseline limitations are explicit. Test known intent directly. Characterize unknown behavior and identify what remains unknown.
 
-## Required workflow
+## Decide from evidence
 
-1. Understand the request and identify the requested outcome.
-2. Inspect repository instructions and establish scope without editing.
-3. Define the objective, paths, and exact tokenized checks.
-4. Preview or validate the run specification before execution.
-5. Invoke the deterministic runner against a clean detached snapshot.
-6. Analyze contextual risks using the evidence baseline.
-7. Validate every finding and its evidence references.
-8. Render the report with blockers, uncertainty, and the next safe step.
+Connect each finding:
 
-Read [references/evidence-baseline.md](references/evidence-baseline.md) before making contextual claims. Read [references/operating-contract.md](references/operating-contract.md) before extending the implementation.
+`observed signal → repository context → predicted cost → confidence → counterargument/falsifier → action and verification`
 
-## Risk classes
+Follow explicit style conventions; describe preferences without turning them into engineering blockers. For maintenance claims, demonstrate duplication, coupling, ownership, change surface, or testability cost and consider where the existing structure earns its cost. For behavior or security claims, identify and exercise the affected contract and path.
 
-- **Style:** convention or taste. Do not present it as an engineering defect without explicit repository evidence.
-- **Maintainability:** change surface, duplication, ownership, isolation, or testability costs supported by repository context.
-- **Behavior/security:** observed incorrectness, unsafe assumptions, validation gaps, authorization issues, data loss, nondeterminism, or resource risks.
+Prioritize explained impact and relevance to the requested work. Metrics and history support local judgment; use no universal slop score or repository-independent thresholds.
 
-Core rule: **Do not automate taste. Search for unjustified cost, missing evidence, mismatched context, and unsafe assumptions.**
+## Change and verify
 
-## Finding format
+For authorized edits, define one objective, affected paths, the invariant or intentional behavior change, a recovery point, and relevant checks. Choose reviewable bounds from the task; expand or split the plan when evidence warrants it.
 
-A validated finding should communicate:
+Apply a logical step, inspect every changed line against the objective, and check it before continuing. Compare with the baseline and retain failure evidence. Recover a step that introduces a regression; continue through the remaining justified steps after each verified checkpoint.
 
-`signal -> contextual evidence -> predicted cost -> confidence -> counterargument/falsifier -> remediation/verification`
+Stop dependent changes when the oracle is inadequate, failure unexplained, contract exceeds the user's scope, or improvement adds more cost than it removes. Continue independent authorized work. Clarify only the missing intent or authority that prevents progress.
 
-Every finding must identify its source and evidence references. Vague directives such as “clean this up” are not actionable findings. A counterargument is required so likely false positives remain visible.
+## Optional runner
 
-## Prohibitions
+Inspect `python3 scripts/run.py --help` and the operating contract. Diagnosis runs selected tokenized checks in a disposable snapshot under Bubblewrap without network access. Refactor and repair consume supplied change steps, enforce declared scope and diff bounds, check the baseline and each step, and recover failed steps. Verified completion exports a reviewable patch. All modes leave the source repository unchanged.
 
-- No universal slop score or arbitrary repository-independent thresholds.
-- No arbitrary execution of commands copied from README or CI text.
-- No shell interpolation, unsandboxed fallback, or hidden network access.
-- No success claim from prose alone or from an asserted status field.
-- No automatic edits in P0.
-- No claim that a pre-existing failing baseline was fixed.
-- No claim of correctness when required evidence is missing, flaky, unavailable, failed, skipped, or tampered with.
+The runner requires a clean source revision. A dirty source or unavailable sandbox is a reported limitation; preserve the source and sandbox boundary. Direct authorized agent edits are a separate workflow; the runner does not apply its exported patch to the source checkout. Finding validation verifies recorded evidence references; contextual judgment remains the agent's responsibility.
 
-## Completion checklist
+## Report the outcome
 
-Before reporting a clean result:
+State the improvement or actionable risk, its consequence, scope, actual checks and results, and material uncertainty. For edits, include intentional behavior changes, pre-existing failures, remaining risks, and the recovery point or exported patch.
 
-- [ ] Source repository was inspected and was clean at discovery.
-- [ ] Exact tokenized checks were explicitly selected.
-- [ ] Checks ran only in the disposable snapshot and Bubblewrap sandbox.
-- [ ] Every attempt has captured, independently verifiable artifacts.
-- [ ] Manifest status is derived rather than accepted from input.
-- [ ] Findings and evidence references validate.
-- [ ] Report status agrees with the manifest.
-- [ ] “No edit is correct” is used only when all required checks pass and no actionable findings remain.
+Distinguish verified checks from hypotheses and unrun checks. Passing tests support only what they exercise. Missing, flaky, unavailable, skipped, or tampered evidence cannot establish a pass; empty findings do not prove correctness.
 
-## Verification
-
-From the `scripts/` directory, run:
-
-```bash
-python3 -m unittest discover -s tests -v
-python3 -m compileall -q run.py anti_slop_core tests
-python3 run.py --help
-```
-
-For a real smoke run, provide a clean Git repository and a JSON run spec with absolute `repo_path` and `snapshot_root`, `mode: diagnose`, and explicit tokenized checks. Verify the emitted `manifest.json`, `report.md`, artifact hashes, and source-repository immutability before trusting the result.
-
-P1–P3 remain deferred. See [references/p1-p3-roadmap.md](references/p1-p3-roadmap.md).
+No edit is valid when no useful supported change remains. Qualify it by reviewed scope and evidence; claim a clean verified result only when all required checks passed and no actionable findings remain.

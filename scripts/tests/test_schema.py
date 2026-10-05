@@ -97,7 +97,7 @@ class SchemaValidationTests(unittest.TestCase):
         with self.assertRaises(SchemaError):
             load_run_spec(payload)
 
-    def test_p0_rejects_non_diagnose_mode(self):
+    def test_write_mode_without_explicit_contract_is_rejected(self):
         payload = {
             "repo_path": "/workspace/repo",
             "snapshot_root": "/workspace/snapshot",
@@ -192,9 +192,14 @@ class SchemaValidationTests(unittest.TestCase):
         }
         finding = {
             "id": "finding-1",
-            "check_id": "unit",
+            "source": "unit",
             "severity": "low",
-            "message": "example",
+            "title": "example",
+            "evidence_refs": ["checks/unit.stdout"],
+            "impact": "Duplicated policy may drift",
+            "confidence": 0.8,
+            "recommended_action": "Compare the two policy branches against the declared contract",
+            "counterargument": "Distinct policies could be intentional",
         }
 
         self.assertIsInstance(load_check_spec(check, snapshot), CheckSpec)
@@ -209,6 +214,10 @@ class SchemaValidationTests(unittest.TestCase):
         )
         self.assertIsInstance(load_finding(finding), Finding)
         self.assertEqual(len(load_findings(json.dumps([finding]))), 1)
+
+    def test_legacy_finding_cannot_fabricate_missing_semantic_fields(self):
+        with self.assertRaises(SchemaError):
+            load_finding({"id": "legacy", "check_id": "unit", "message": "example", "severity": "low"})
 
     def test_manifest_loader_builds_nested_frozen_models(self):
         payload = {
