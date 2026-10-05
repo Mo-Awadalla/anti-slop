@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "baseline_revision": "72c036bc091de35823318071330488d2919a0d12",
+  "delivery": "Local working-tree changes; not pushed",
+  "linux_regression": {
+    "command": "python3 scripts/container.py test",
+    "discovered": 138,
+    "passed": 133,
+    "skipped": 5,
+    "skip_reason": "Linux-root-only UID mapping tests",
+    "outcome": "passed"
+  },
+  "root_permission_regression": {
+    "tests": 9,
+    "passed": 9,
+    "covers_all_five_root_skips": true,
+    "boundary": "Isolated Linux root probe with temporary extra capabilities, no Docker socket, readonly runner; production launcher has no added capabilities"
+  },
+  "cli_e2e": {
+    "command": "python3 scripts/container.py exec --evidence HOST_DIRECTORY -- /usr/bin/python3 e2e.py --output /evidence/run",
+    "scenarios": 11,
+    "passed": 11,
+    "mutation_counts": {
+      "detected": 1,
+      "survived": 1,
+      "inconclusive": 4
+    },
+    "raw_host_artifacts": "/tmp/anti-slop-e2e-evidence/run-6",
+    "summary": "cli-e2e.json"
+  },
+  "ci_local_proof": {
+    "result": "Exact normalization program completed; absolute cwd remapped; direct/indexed/base sandbox SARIF locations exported; captured file digests match source",
+    "sarif": "ci-results.sarif",
+    "github_hosted_dispatch_and_upload": "not exercised"
+  },
+  "paired_skill": {
+    "cases": 3,
+    "criteria_per_arm": 9,
+    "initial_original_passed": 9,
+    "initial_revised_passed": 8,
+    "final_original_passed": 9,
+    "final_revised_passed": 9,
+    "correction": "Restored explicit baseline execution in the entrypoint",
+    "runs_per_case_configuration_iteration": 1,
+    "tokens": "unavailable",
+    "broad_superiority_claim": false,
+    "entrypoint_original_lines": 69,
+    "entrypoint_final_lines": 69,
+    "entrypoint_original_utf8_bytes": 5384,
+    "entrypoint_final_utf8_bytes": 5591,
+    "original_skill_sha256": "59970abeb7669f810e2c1ec470f818815bc5f610119707fb491bd684bd3225cb",
+    "final_skill_sha256": "a1c9914c103e634e2903d1d664f9d64c971857f8c165814e17199a793697282f",
+    "review": "review.html",
+    "raw_trials": "paired-trials.json"
+  },
+  "independent_review": {
+    "model": "openai-codex/gpt-6-astra:xhigh",
+    "findings_addressed": 6,
+    "checks_performed_by_reviewer": false,
+    "additional_actual_controls": "Signal and positive file-resource errors classify inconclusive; mounted absolute verifier bypass reproduced then blocked"
+  },
+  "resource_observations": {
+    "default_memory_max": 2147483648,
+    "default_memory_swap_max": 0,
+    "default_pids_max": 256,
+    "default_cpu_max": "200000 100000",
+    "aggregate_stdout_stderr_bytes": 1048576,
+    "memory_probe": "128 MiB cgroup killed 256 MiB allocator with SIGKILL; oom_kill increased to 1",
+    "process_probe": "16-pid cgroup refused next spawn with EAGAIN after 14 child sleepers"
+  },
+  "compatibility": {
+    "write_evidence_schema": 2,
+    "sandboxed_field": "required boolean; programmatic omission false",
+    "baseline_bytes": "All tracked files exported; evidence may contain tracked secrets"
+  },
+  "limits": [
+    "Docker seccomp=unconfined and systempaths=unconfined required on tested host; not uniform hostile-code protection",
+    "Unsigned provenance and isolation flags are not authenticated",
+    "Dynamic oracle imports, custom unsignaled helpers and other languages need explicit protection",
+    "Fixture outcomes do not establish general maintainability, hidden regression, token or performance gains"
+  ]
+}

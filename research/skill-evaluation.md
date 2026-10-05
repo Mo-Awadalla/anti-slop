@@ -39,4 +39,39 @@ The bundled skill validator reports `Skill is valid!`; whitespace checks and loc
 
 ## Limits
 
-The qualitative outcomes support these particular decisions and fixture oracles. They provide no prevalence estimate, general false-positive rate, review-time reduction, hidden-regression rate, or cross-model effectiveness claim. Baseline-agent versus anti-slop-agent comparisons, unseen tasks, multiple languages and models, repeated trials, and the blueprint's full paired evaluation remain unperformed. Local acceptance tests and real repository pilots are reported separately.
+The original qualitative outcomes support those fixture decisions and oracles. They provide no prevalence estimate, general false-positive rate, review-time reduction, hidden-regression rate, or cross-model effectiveness claim. The full baseline-agent-versus-anti-slop corpus study, unseen tasks, multiple languages, and repeated trials remain unperformed. The later original-versus-revised comparison below is narrower.
+
+## Original-versus-revised comparison on 2026-10-05
+
+Separate task agents received the same three fixture requests and either the
+original skill at `72c036bc` or the revised entrypoint. They were not told the
+grading criteria, other arm, or previous outcomes. Parent-side consumer checks
+exercised literal contracts and reapplied the original `+1` defect in an isolated
+copy to check the replacement oracle.
+
+| Case | Original, final comparison | Revised, final comparison |
+| --- | --- | --- |
+| Clean warning control | 3/3 criteria; no production edit | 3/3 criteria; no production edit |
+| Optional discount without a registry | 3/3; baseline and final checks recorded | 3/3; baseline and final checks recorded |
+| Weak multiplication oracle | 3/3; independent assertions detect the original defect | 3/3; independent assertions detect the original defect |
+| Total | 9/9 | 9/9 |
+
+The initial revision scored 8/9 because its prevention run skipped baseline
+execution. The original scored 9/9. Restoring the explicit baseline instruction
+corrected that regression; the second comparison above used fresh agents.
+The actual revised prevention transcript records baseline execution before
+test and production edits. Both iterations remain in the
+[retained trial evidence](improvement-evidence/paired-trials.json).
+
+There was one trial per case and configuration in each iteration. Resolved
+executor models and token metrics were not exposed. Rounded task durations
+are observations, not a performance benchmark. Both entrypoints have 69 lines;
+the revised file is 5,591 UTF-8 bytes versus 5,384 originally. Progressive
+disclosure already existed, and no token reduction is claimed.
+
+These results support preservation of these outcomes, not superiority or
+general maintainability gains. The concrete optimizations are tracked-only
+copy/fingerprinting and bounded process/output handling; the comparison does
+not measure broad agent efficiency. The
+[static review viewer](improvement-evidence/review.html) presents reports,
+grading, and the previous iteration without hiding the initial failure.

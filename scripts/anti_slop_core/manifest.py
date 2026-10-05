@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import uuid
 from dataclasses import asdict
 from enum import Enum
+import tempfile
 from pathlib import Path
 from typing import Iterable, Optional, Set
 
 from .models import (
     ArtifactRef, AttemptStatus, CheckRecord, CheckStatus, CommandAttempt,
     DiscoveryInfo, Finding, ManifestStatus, RunManifest, RunMode,
+)
+from .diff_budget import (
+    DiffGuardError, analyze_diff, read_tree, replay_patch,
+    tree_identities, tree_sha256,
 )
 
 
@@ -145,7 +151,7 @@ def _validate_write_evidence(manifest: RunManifest, store, by_path: dict) -> Non
         evidence = json.loads(store.read(audit))
     except (ValueError, UnicodeError) as exc:
         raise ValueError("write evidence must be valid JSON") from exc
-    if not isinstance(evidence, dict) or evidence.get("schema_version") != 1 or evidence.get("mode") != manifest.mode.value:
+    if not isinstance(evidence, dict) or evidence.get("schema_version") != 2 or evidence.get("mode") != manifest.mode.value:
         raise ValueError("write evidence mode or schema is inconsistent")
     if evidence.get("stop_reason") != manifest.stop_reason:
         raise ValueError("write evidence stop reason is inconsistent")
@@ -207,8 +213,73 @@ def _validate_write_evidence(manifest: RunManifest, store, by_path: dict) -> Non
     paths = [entry.get("path") for entry in entries]
     if len(paths) != len(set(paths)) or any(path not in allowed or path in protected for path in paths):
         raise ValueError("write export contains undeclared or protected paths")
-    patch = store.read(by_path["write/final.patch"])
-    expected_headers = [f"diff --git a/{path} b/{path}" for path in sorted(paths)]
-    actual_headers = [line for line in patch.decode("utf-8").split('\n') if line.startswith("diff --git ")]
-    if actual_headers != expected_headers or (not entries and patch):
-        raise ValueError("exported patch disagrees with the final diff record")
+    _validate_patch_replay(evidence, baseline, steps, store, by_path)
+
+
+def _materialize_baseline(root: Path, data: bytes) -> dict:
+    try:
+        encoded = json.loads(data)
+        if not isinstance(encoded, dict):
+            raise ValueError("baseline tree must be an object")
+        for path, state in encoded.items():
+            # Baseline names may contain spaces; edited patch paths may not.
+            if not isinstance(path, str) or not path or path.startswith('/') or any(part in ('', '.', '..', '.git') for part in path.split('/')):
+                raise ValueError("unsafe baseline tree path")
+            if not isinstance(state, dict) or set(state) != {'content_base64', 'mode'}:
+                raise ValueError("invalid baseline file state")
+            mode = state['mode']
+            if type(mode) is not int or not 0 <= mode <= 0o7777:
+                raise ValueError("invalid baseline file mode")
+            content = base64.b64decode(state['content_base64'], validate=True)
+            target = root / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open('xb') as output:
+                output.write(content)
+            target.chmod(mode)
+        return read_tree(root)
+    except (OSError, TypeError, UnicodeError, ValueError) as exc:
+        raise ValueError(f"invalid replay baseline: {exc}") from exc
+
+
+def _validate_patch_replay(evidence, baseline, steps, store, by_path) -> None:
+    baseline_path = baseline.get('tree_artifact')
+    if baseline_path != 'write/baseline-tree.json' or baseline_path not in by_path:
+        raise ValueError("write evidence requires exported baseline bytes")
+    baseline_data = store.read(by_path[baseline_path])
+    try:
+        with tempfile.TemporaryDirectory(prefix='anti-slop-verifier-') as directory:
+            root = Path(directory)
+            initial = _materialize_baseline(root, baseline_data)
+            if tree_sha256(initial) != baseline.get('tree_sha256') or tree_identities(initial) != baseline.get('identities'):
+                raise ValueError("exported baseline bytes/modes disagree with recorded identity")
+            current = initial
+            for index, step in enumerate(steps, 1):
+                path = f'write/step-{index}.patch'
+                if step.get('patch_artifact') != path or path not in by_path:
+                    raise ValueError("write step requires an exported replay patch")
+                if tree_sha256(current) != step.get('before_tree_sha256'):
+                    raise ValueError("replayed checkpoint chain disagrees")
+                replayed = replay_patch(root, store.read(by_path[path]))
+                if tree_sha256(replayed) != step.get('after_tree_sha256') or tree_identities(replayed) != step.get('identities'):
+                    raise ValueError("replayed step bytes/modes disagree with recorded identity")
+                if analyze_diff(current, replayed) != step.get('changes'):
+                    raise ValueError("replayed step disagrees with recorded diff")
+                protected = set(evidence.get('effective_protected_paths', [])) | set(evidence.get('oracle_paths', [])) | set(evidence.get('protected_paths', []))
+                allowed = set(evidence.get('allowed_paths', []))
+                if any(entry['path'] not in allowed or entry['path'] in protected for entry in step['changes']['entries']):
+                    raise ValueError("replayed step changes undeclared or protected paths")
+                current = replayed
+            if tree_sha256(current) != evidence.get('final_tree_sha256') or tree_identities(current) != evidence.get('final_identities'):
+                raise ValueError("replayed final tree disagrees with recorded identity")
+            if analyze_diff(initial, current) != evidence.get('final_changes'):
+                raise ValueError("replayed final diff disagrees with recorded changes")
+            expected = current
+        # Replay the actual public export independently of the step sequence.
+        with tempfile.TemporaryDirectory(prefix='anti-slop-export-verifier-') as directory:
+            root = Path(directory)
+            _materialize_baseline(root, baseline_data)
+            actual = replay_patch(root, store.read(by_path['write/final.patch']))
+            if actual != expected:
+                raise ValueError("exported patch does not reproduce recorded final bytes/modes")
+    except (DiffGuardError, OSError) as exc:
+        raise ValueError(f"write patch replay failed: {exc}") from exc

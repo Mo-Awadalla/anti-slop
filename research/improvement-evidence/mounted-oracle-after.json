@@ -1,0 +1,5 @@
+{
+  "exit": 1,
+  "stdout": "{\"manifest\": \"/evidence/mounted-oracle-after-home/cache/anti-slop/runs/run-ac9463384c53422e8ab770832907e41a/manifest.json\", \"provenance\": \"/evidence/mounted-oracle-after-home/cache/anti-slop/runs/run-ac9463384c53422e8ab770832907e41a/provenance.json\", \"report\": \"/evidence/mounted-oracle-after-home/cache/anti-slop/runs/run-ac9463384c53422e8ab770832907e41a/report.md\", \"run_id\": \"run-ac9463384c53422e8ab770832907e41a\", \"status\": \"stopped\"}\n",
+  "stderr": ""
+}

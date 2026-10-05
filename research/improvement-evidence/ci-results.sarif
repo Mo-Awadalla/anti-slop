@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "results": [
+        {
+          "level": "note",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "scripts/anti_slop_core/models.py"
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "4afbed21615b422e42486ac3225ee178e46baefbf5733e074873de1c099f4d5b"
+          },
+          "properties": {
+            "antiSlopObservation": "tool-signal; requires contextual adjudication",
+            "antiSlopSignalId": "sarif-1-1"
+          },
+          "ruleId": "file-identity"
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "scripts/anti_slop_core/checks.py"
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "037ed1aba920560c13e6fa9f52c1edce54c310f1cdd7d673479bab1a837a748b"
+          },
+          "properties": {
+            "antiSlopObservation": "tool-signal; requires contextual adjudication",
+            "antiSlopSignalId": "sarif-1-2"
+          },
+          "ruleId": "file-identity"
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "scripts/anti_slop_core/cli.py"
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "ee808d225bd3a812a40acdf7e82cdb04d4cf98dbb74db43cb1d5909a0ee15a3d"
+          },
+          "properties": {
+            "antiSlopObservation": "tool-signal; requires contextual adjudication",
+            "antiSlopSignalId": "sarif-1-3"
+          },
+          "ruleId": "file-identity"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "name": "FixtureScanner",
+          "rules": [
+            {
+              "id": "file-identity"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

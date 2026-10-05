@@ -10,6 +10,8 @@ import os
 import subprocess
 from pathlib import Path
 
+from anti_slop_core.process_limits import run_bounded
+
 
 class LocalFixtureSandbox:
     def __init__(self, workspace):
@@ -17,13 +19,11 @@ class LocalFixtureSandbox:
 
     def run(self, command, cwd=".", timeout=None):
         working = Path(cwd) if Path(cwd).is_absolute() else self.workspace / cwd
-        return subprocess.run(
+        return run_bounded(
             command,
             cwd=working,
-            capture_output=True,
-            timeout=timeout or 10,
+            timeout=10 if timeout is None else timeout,
             env={"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": str(self.workspace)},
-            shell=False,
         )
 
 

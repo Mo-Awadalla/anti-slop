@@ -1,8 +1,8 @@
 # Acceptance and evaluation boundaries
 
-This document records implementation acceptance for the expanded skill and
-runner. It does not replace either preserved research source or claim that a
-model evaluation has been performed.
+This document records runner acceptance and its limits. Historical execution
+records remain below; the later improvement run records current contracts,
+real CLI controls, and the boundary of the small paired skill comparison.
 
 ## Reproducing the implementation checks
 
@@ -72,7 +72,7 @@ result is claimed.
 | 6 | Legacy characterization | Workflow explains observation and normalization. The hand-authored fixture is sensitive to a defect; automatic harness generation and volatile-field normalization have not been implemented or evaluated. |
 | 7 | Golden-master approval | Workflow distinguishes intentional contract changes; runner rejects intentional-change contracts. No golden-master update integration or approval trial has been performed. |
 | 8 | Weak generated test | Workflow requires independent assertions and retained boundaries. No automatic semantic detector of self-derived expectations is claimed. |
-| 9 | Mutation gate | Automated fixture injects a `+1` behavior mutation and detects it through independent outputs; failed step recovered. General mutation-tool integration and mutation-score studies unperformed. |
+| 9 | Mutation gate | Independent fixtures detect a `+1` behavior mutation. The supplied-mutant audit distinguishes detection, survival, timeout, signal, file-limit, and descriptor-limit outcomes. General language mutation engines and score studies remain unperformed. |
 | 10 | Property invariant | Fixture covers zero, negative, integer, and fractional boundaries. Generated property exploration has not been performed. |
 | 11 | Integration contract | Supplied external contract checks can be selected. No provider/consumer integration fixture or external-system experiment has been performed. |
 | 12 | Atomic refactor | Automated real CLI and deterministic fixtures verify one supplied transformation, preserve its oracle, retain snapshot checkpoint evidence, and export a replayable patch. |
@@ -82,11 +82,11 @@ result is claimed.
 | 16 | Bisectable sequence | Per-step check IDs and audit localize the deliberately bad step. Snapshot checkpoints are not Git commits; no automatic `git bisect` integration or multi-revision empirical trial is claimed. |
 | 17 | Semantic codemod | Workflow supports choosing an existing project tool and reviewing its output. Runner applies supplied finite text changes; no semantic codemod engine is bundled. |
 | 18 | Style-only control | Workflow/tabletop review keeps size or preference alone from establishing a defect. Blinded style false-positive model trials unperformed. |
-| 19 | Hotspot prioritization | Workflow uses explained impact and available history. No automatic churn/complexity ranking or hotspot comparison study is claimed. |
-| 20 | Over-engineering trap | Workflow asks what real boundary or change cost an abstraction serves. No automated cost/benefit inference or comparative model study is claimed. |
+| 19 | Hotspot prioritization | Git touch-count ranking uses an explicit window and unsimplified branch history without changing severity. Complexity ranking and broad hotspot effectiveness studies remain unperformed. |
+| 20 | Over-engineering trap | A small original-versus-revised prevention comparison rejects the speculative registry and preserves discount behavior. Automated cost/benefit inference and broad comparative efficacy remain unclaimed. |
 | 21 | No metric gaming | Automated immutable oracle files, argv verifier protection, and protected configuration stop several concrete bypasses. Semantic weakness in undeclared tests or metric gaming still requires review; no universal detector is claimed. |
 | 22 | Negative tradeoff | Workflow examines coupling, public surface, dependencies, and test weakness. No automatic equivalence or maintainability-tradeoff proof is claimed. |
-| 23 | Clean control | Automated empty supplied sequence retains the exact original production content. This establishes no forced runner edit; model abstention rates remain unperformed. |
+| 23 | Clean control | Empty supplied runner sequences preserve production. Both arms of the later clean-control skill trial leave the serializer unchanged; no population abstention-rate estimate is claimed. |
 | 24 | Complete report | Reports/manifest record commands, exits, artifacts, actual file/line changes, baseline, stop and recovered snapshot hashes. They do not invent metric deltas or rollback commits; contextual risks and test coverage are agent report responsibilities. |
 | 25 | Finding evidence | Automated findings require semantic fields, their declared source check's captures, and valid artifact references. The guide labels source-inspection hypotheses. Validator cannot prove a claim's meaning. |
 | 26 | Production attribution | Steps require one stated intent and exact bounded changes. Semantic line-to-objective attribution remains contextual agent review. |
@@ -114,12 +114,12 @@ regression rates, false-positive rates, median diff size, general mutation
 scores, long-term maintainability, or cross-model performance. Confidence
 intervals and corpus-calibrated quality thresholds remain study outputs.
 
-Automated characterization generation, semantic codemods, hotspot analysis,
+Automated characterization generation, semantic codemods, complexity ranking,
 integration-specific security scanners, property-test generation, and a full
-27-case cross-repository agent benchmark are not implied by local fixture
-acceptance. The skill explains how to select these tools where a task needs
-them. Real repository pilot results are recorded separately in
-`research/pilot-results.md` when produced.
+27-case cross-repository agent benchmark are not implied by local acceptance.
+The small original-versus-revised comparison is recorded in
+[skill evaluation](skill-evaluation.md). It is not the blueprint's full
+baseline-agent-versus-anti-slop corpus study.
 
 ## Run record
 
@@ -133,3 +133,33 @@ The earlier restricted execution run found 80 tests: 76 passed and 4 real
 Bubblewrap tests explicitly skipped because the outer restriction denied
 `NETLINK_ROUTE`. That run alone did not establish the isolation claims; the
 final zero-skip execution above did exercise those cases.
+
+## Improvement run on 2026-10-05
+
+- Linux regression suite found 138 tests. 133 passed; five Linux-root-only cases skipped in the nonroot container.
+- A separate isolated Linux-root run passed all nine launcher tests, including those five skipped permission cases. Temporary capabilities belonged only to that probe, not the production launcher.
+- All 11 real CLI scenarios passed. They cover tracked-source preservation and ignored-secret exclusion, absent protected paths, failed-step rollback, imported helpers, mounted absolute verifier inputs, red baselines, supplied mutants, rehashed patch-body tampering, bounded output, SARIF/history/provenance, and diagnosis SARIF export.
+- The six supplied mutants produced one detection, one survivor, and four inconclusive outcomes. Timeout, SIGKILL, file-size errors, and descriptor exhaustion did not count as assertion coverage.
+- The exact CI normalization program ran locally with absolute check cwd and direct, indexed, and base-relative sandbox URIs. Exported file identities matched source bytes. Hosted GitHub dispatch and upload were not exercised.
+
+The Docker cgroup exposed 2 GiB memory, no swap, 256 processes, and two CPUs.
+A separate 128 MiB probe killed a 256 MiB allocator and incremented `oom_kill`.
+A 16-pid probe rejected the next spawn with `EAGAIN` after 14 child sleepers.
+Captured stdout/stderr remained within the 1 MiB aggregate limit.
+
+Independent review found six boundary defects that were corrected. Additional
+actual controls reproduced false mutation detection from a file-size error and
+a false pass from editing `/workspace/contract.py`; both now fail conservatively
+or reject the edit. Regression coverage retains those consumer-visible cases.
+
+Reproduce the CLI controls with `scripts/e2e.py` through the documented container
+launcher. [Compact results and retained evidence](improvement-evidence/results.json)
+include both paired iterations and the static review viewer. Full CLI fixtures
+and captures remain at `/tmp/anti-slop-e2e-evidence/run-6` on the development host.
+
+Write evidence now requires schema version 2 and explicit isolation fields.
+Historical version-1 artifacts above remain archived, not recertified.
+Unsigned provenance is not authenticated; full tracked baseline bytes can
+contain tracked secrets. The tested Docker exceptions remove default seccomp
+and masked-proc protections, so these results do not establish uniform
+hostile-code security or general maintainability gains.

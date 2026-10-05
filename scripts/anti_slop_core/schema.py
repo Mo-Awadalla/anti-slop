@@ -298,7 +298,7 @@ def _attempt(value: Any, snapshot_root: str, path: str) -> CommandAttempt:
     obj = _object(value, path)
     allowed = {"check_id", "argv", "cwd", "status", "exit_code", "duration_ms", "stdout_artifact", "stderr_artifact", "sandboxed"}
     _keys(obj, allowed, path)
-    _required(obj, {"check_id", "argv", "cwd", "status"}, path)
+    _required(obj, {"check_id", "argv", "cwd", "status", "sandboxed"}, path)
     exit_code = None if obj.get("exit_code") is None else _integer(obj["exit_code"], f"{path}.exit_code")
     duration = None if obj.get("duration_ms") is None else _number(obj["duration_ms"], f"{path}.duration_ms", minimum=0)
     return CommandAttempt(
@@ -307,7 +307,7 @@ def _attempt(value: Any, snapshot_root: str, path: str) -> CommandAttempt:
         exit_code, duration,
         _artifact(obj["stdout_artifact"], f"{path}.stdout_artifact") if obj.get("stdout_artifact") is not None else None,
         _artifact(obj["stderr_artifact"], f"{path}.stderr_artifact") if obj.get("stderr_artifact") is not None else None,
-        _bool(obj.get("sandboxed", True), f"{path}.sandboxed"),
+        _bool(obj["sandboxed"], f"{path}.sandboxed"),
     )
 
 

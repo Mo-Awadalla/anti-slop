@@ -181,6 +181,13 @@ class SchemaValidationTests(unittest.TestCase):
         with self.assertRaises(SchemaError):
             load_run_manifest(payload)
 
+    def test_omitted_isolation_evidence_is_rejected(self):
+        # Omitted isolation evidence must never be upgraded into a pass.
+        for status in ("passed", "failed", "unavailable"):
+            with self.subTest(status=status), self.assertRaises(SchemaError):
+                load_command_attempt({"check_id": "unit", "argv": ["true"],
+                                      "cwd": ".", "status": status}, "/workspace/snapshot")
+
     def test_each_public_model_loader_validates_its_json_shape(self):
         snapshot = "/workspace/snapshot"
         check = {"id": "unit", "argv": ["true"], "cwd": "."}
@@ -189,6 +196,7 @@ class SchemaValidationTests(unittest.TestCase):
             "argv": ["true"],
             "cwd": ".",
             "status": "passed",
+            "sandboxed": True,
         }
         finding = {
             "id": "finding-1",
@@ -237,6 +245,7 @@ class SchemaValidationTests(unittest.TestCase):
                             "cwd": ".",
                             "status": "passed",
                             "exit_code": 0,
+                            "sandboxed": True,
                             "stdout_artifact": {"path": "checks/unit.stdout", "sha256": "a" * 64, "size_bytes": 0},
                             "stderr_artifact": {"path": "checks/unit.stderr", "sha256": "b" * 64, "size_bytes": 0},
                         }

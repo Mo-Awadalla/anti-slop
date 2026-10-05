@@ -118,7 +118,7 @@ class CommandAttempt:
     duration_ms: Optional[float] = None
     stdout_artifact: Optional[ArtifactRef] = None
     stderr_artifact: Optional[ArtifactRef] = None
-    sandboxed: bool = True
+    sandboxed: bool = False
 
 
 @dataclass(frozen=True)

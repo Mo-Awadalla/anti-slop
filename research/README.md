@@ -18,8 +18,10 @@ new evidence is recorded separately:
   trust defects, source preservation, and observed runner friction.
 - [Acceptance results](acceptance-results.md) — deterministic and real-sandbox
   runner tests, plus the boundary of each proposed blueprint acceptance case.
-- [Skill evaluation](skill-evaluation.md) — qualitative forward scenarios
-  following Matt's skill-writing principles, with limits on outcome claims.
+- [Skill evaluation](skill-evaluation.md) records qualitative forward scenarios
+  and a small original-versus-revised comparison with independently exercised
+  consumer checks. [Retained improvement evidence](improvement-evidence/results.json)
+  includes both iterations and a static review viewer.
 
 These checks are not the missing original research reports or a completed
 paired baseline-agent versus anti-slop-agent corpus experiment.

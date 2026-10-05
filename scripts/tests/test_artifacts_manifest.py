@@ -88,6 +88,17 @@ class ManifestIntegrityTests(unittest.TestCase):
         record = replace(record, attempts=(replace(record.attempts[0], sandboxed=False),))
         self.assertNotEqual(derive_check_status(record), CheckStatus.PASSED)
 
+    def test_programmatic_omission_cannot_certify_a_pass(self):
+        from anti_slop_core.models import ArtifactRef
+        attempt = CommandAttempt(
+            "unit", ("true",), ".", AttemptStatus.PASSED, 0,
+            stdout_artifact=ArtifactRef("stdout", "a" * 64, 0),
+            stderr_artifact=ArtifactRef("stderr", "b" * 64, 0),
+        )
+        self.assertFalse(attempt.sandboxed)
+        self.assertEqual(derive_check_status(CheckRecord("unit", CheckStatus.PASSED, (attempt,))),
+                         CheckStatus.FAILED)
+
     def test_declared_artifact_metadata_must_match_attempt_metadata(self):
         from dataclasses import replace
         from anti_slop_core.manifest import validate_manifest_artifacts

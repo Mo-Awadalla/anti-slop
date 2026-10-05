@@ -3,7 +3,7 @@ name: anti-slop
 description: Prevent code slop; diagnose, refactor, repair with evidence.
 license: MIT
 metadata:
-  version: 2.0.0
+  version: 2.1.0
   author: Mohamed
   runner_platforms: [linux]
   hermes:
@@ -26,15 +26,13 @@ Use the user's request to select the mode and scope:
 - **Refactor:** remove a concrete structural cost while preserving observable behavior.
 - **Repair:** fix an evidenced defect or verification gap; record intentional behavior changes against the requested contract.
 
-Read [agent-workflow.md](references/agent-workflow.md) for prevention or code-changing work, including characterization and recovery. Read [evidence-baseline.md](references/evidence-baseline.md) before judging a signal or making a verification claim. Read [operating-contract.md](references/operating-contract.md) when using or extending the runner.
+Load only the reference needed for the selected work. Read [agent-workflow.md](references/agent-workflow.md) for prevention or authorized edits. Read [evidence-baseline.md](references/evidence-baseline.md) before judging a signal or making a verification claim. Read [operating-contract.md](references/operating-contract.md) only when running or extending the optional runner.
 
 ## Establish context
 
-Inspect project instructions, relevant callers and tests, and current working changes. Identify the required outputs, errors, side effects, ordering, permissions, persistence, and public interfaces. Preserve unrelated user work; choose an isolated checkout when needed.
+Inspect project instructions, affected callers and tests, and existing changes. Name the behavior contract, editable scope, independent oracle, and baseline limitations. Preserve unrelated user work.
 
-Select relevant checks from project configuration, CI, and documentation and record actual baseline results. Discovered commands are candidates; deliberately choose exact commands and an appropriate execution environment.
-
-Continue when the target, behavior contract, existing changes, verification oracle, and baseline limitations are explicit. Test known intent directly. Characterize unknown behavior and identify what remains unknown.
+Choose exact checks from project configuration, CI, or documentation. Before editing, run the selected baseline checks and record commands, exit codes, results, and execution limits. Discovered commands are candidates, not authorization to execute them. Test known intent directly; characterize unknown behavior and record what remains unknown.
 
 ## Decide from evidence
 
@@ -46,6 +44,8 @@ Follow explicit style conventions; describe preferences without turning them int
 
 Prioritize explained impact and relevance to the requested work. Metrics and history support local judgment; use no universal slop score or repository-independent thresholds.
 
+Do not edit for AI authorship, size, churn, a surviving mutant, or a tool alert alone. Abstain when the difference is taste or the existing boundary earns its cost. A requested style change still follows the project's convention. SARIF records tool signals; history ranks review attention without changing severity. Neither supplies the missing contextual argument.
+
 ## Change and verify
 
 For authorized edits, define one objective, affected paths, the invariant or intentional behavior change, a recovery point, and relevant checks. Choose reviewable bounds from the task; expand or split the plan when evidence warrants it.
@@ -56,7 +56,7 @@ Stop dependent changes when the oracle is inadequate, failure unexplained, contr
 
 ## Optional runner
 
-Inspect `python3 scripts/run.py --help` and the operating contract. Diagnosis runs selected tokenized checks in a disposable snapshot under Bubblewrap without network access. Refactor and repair consume supplied change steps, enforce declared scope and diff bounds, check the baseline and each step, and recover failed steps. Verified completion exports a reviewable patch. All modes leave the source repository unchanged.
+Inspect `python3 scripts/run.py --help` and the operating contract. The Linux runner runs selected tokenized checks in a tracked-file snapshot under Bubblewrap without network access. Supplied edits must satisfy a green baseline, immutable verification inputs, and declared diff bounds. Verified completion exports a replayable patch and unsigned provenance. Resource failures never count as passes.
 
 The runner requires a clean source revision. A dirty source or unavailable sandbox is a reported limitation; preserve the source and sandbox boundary. Direct authorized agent edits are a separate workflow; the runner does not apply its exported patch to the source checkout. Finding validation verifies recorded evidence references; contextual judgment remains the agent's responsibility.
 

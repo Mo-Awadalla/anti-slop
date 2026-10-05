@@ -12,6 +12,7 @@ from typing import Iterable, Optional
 from .artifacts import ArtifactStore
 from .models import ArtifactRef, AttemptStatus, CheckRecord, CheckSpec, CommandAttempt
 from .sandbox import BubblewrapSandbox, SandboxUnavailable
+from .process_limits import DEFAULT_LIMITS, OutputLimitExceeded, with_diagnostic
 
 
 def _safe_id(value: str) -> str:
@@ -39,6 +40,7 @@ def run_check(spec: CheckSpec, sandbox: BubblewrapSandbox, store: ArtifactStore)
     attempts: list[CommandAttempt] = []
     artifacts: list[ArtifactRef] = []
     count = 2 if spec.rerun else 1
+    capture_cap = getattr(sandbox, "limits", DEFAULT_LIMITS).output_bytes
     for number in range(1, count + 1):
         if not _runner_available(spec.argv, sandbox, spec.cwd):
             stdout, stderr, status, code = b"", f"runner unavailable: {spec.argv[0]}\n".encode(), AttemptStatus.UNAVAILABLE, None
@@ -55,12 +57,18 @@ def run_check(spec: CheckSpec, sandbox: BubblewrapSandbox, store: ArtifactStore)
                     status = AttemptStatus.UNAVAILABLE
                 else:
                     status = AttemptStatus.PASSED if code == 0 else AttemptStatus.FAILED
+                if code < 0:
+                    stdout, stderr = with_diagnostic(stdout, stderr, f"check terminated by signal {-code}; not a passing result", capture_cap)
+            except OutputLimitExceeded as exc:
+                stdout, stderr = exc.stdout, exc.stderr
+                code, status = None, AttemptStatus.FAILED
             except subprocess.TimeoutExpired as exc:
                 stdout = exc.stdout or b""
                 stderr = exc.stderr or b""
                 if isinstance(stdout, str): stdout = stdout.encode()
                 if isinstance(stderr, str): stderr = stderr.encode()
-                stderr += b"\ncheck timed out\n"
+                if b"check timed out" not in stderr:
+                    stdout, stderr = with_diagnostic(stdout, stderr, "check timed out", capture_cap)
                 code, status = None, AttemptStatus.FAILED
             except SandboxUnavailable as exc:
                 stdout, stderr, code, status = b"", (str(exc) + "\n").encode(), None, AttemptStatus.UNAVAILABLE

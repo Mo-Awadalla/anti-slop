@@ -1,0 +1,55 @@
+{
+  "cases": [
+    {
+      "case": "preservation_and_secret_exclusion",
+      "verdict": "verified"
+    },
+    {
+      "case": "absent_protected_path_preserves_valid_write",
+      "verdict": "verified"
+    },
+    {
+      "case": "failed_step_restores_previous_green_tree",
+      "verdict": "verified"
+    },
+    {
+      "case": "imported_assertion_helper_is_immutable",
+      "verdict": "verified"
+    },
+    {
+      "case": "mounted_absolute_verifier_is_immutable",
+      "verdict": "verified"
+    },
+    {
+      "case": "oracle_kills_mutant_and_red_baseline_stops_edits",
+      "verdict": "verified"
+    },
+    {
+      "case": "on_demand_mutation_detection_and_survivor_reporting",
+      "verdict": "verified"
+    },
+    {
+      "case": "rehashed_patch_body_tamper_rejected",
+      "verdict": "verified"
+    },
+    {
+      "case": "output_flood_is_bounded_failure",
+      "verdict": "verified"
+    },
+    {
+      "case": "captured_sarif_history_ranking_export_and_provenance",
+      "verdict": "verified"
+    },
+    {
+      "case": "diagnosis_emits_captured_sarif_for_read_only_ci",
+      "verdict": "verified"
+    }
+  ],
+  "cgroup_limits": {
+    "cpu.max": "200000 100000",
+    "memory.max": "2147483648",
+    "pids.max": "256"
+  },
+  "kind": "actual-cli-efficacy",
+  "limits": "Synthetic contract scenarios, not general maintenance or model efficacy evidence."
+}

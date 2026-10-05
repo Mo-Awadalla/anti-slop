@@ -8,6 +8,7 @@ execution for Bubblewrap; real isolation is covered by the smoke tests.
 import json
 import io
 import tempfile
+import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -66,7 +67,7 @@ class WriteAcceptanceTests(unittest.TestCase):
             "repo_path": str(self.source),
             "snapshot_root": str(self.root / "snapshot"),
             "mode": "refactor",
-            "checks": [{"id": "contract", "argv": ["/usr/bin/python3", "-B", "contract.py"]}],
+            "checks": [{"id": "contract", "argv": [sys.executable, "-B", "contract.py"]}],
             "objective": "Remove the duplicate zero case from price",
             "behavior_budget": "preserve",
             "allowed_paths": ["calc.py"],
@@ -84,6 +85,13 @@ class WriteAcceptanceTests(unittest.TestCase):
 
     def assert_source_untouched(self):
         self.assertEqual(tree_identity(self.source), self.original_tree)
+
+    def test_absent_protected_python_path_does_not_block_valid_refactor(self):
+        manifest, _, _ = self.run_fixture(protected_paths=["future_helper.py"])
+        self.assertEqual(manifest.status, ManifestStatus.PASSED)
+        self.assertEqual((self.root / "snapshot/calc.py").read_text(), SIMPLIFIED)
+        self.assertFalse((self.root / "snapshot/future_helper.py").exists())
+        self.assert_source_untouched()
 
     def test_small_atomic_refactor_exports_verified_patch_and_evidence(self):
         manifest, manifest_path, report_path = self.run_fixture()
@@ -172,6 +180,60 @@ class WriteAcceptanceTests(unittest.TestCase):
         finally:
             (store.root / original_ref.path).write_bytes(original_data)
 
+    def test_rehashed_patch_hunk_tamper_is_rejected_by_actual_replay(self):
+        from dataclasses import replace
+        import hashlib
+        manifest, _, _ = self.run_fixture()
+        store = ArtifactStore(manifest.run_id, str(self.root / "evidence"))
+        original_ref = next(ref for ref in manifest.artifacts if ref.path == "write/final.patch")
+        original_data = store.read(original_ref)
+        changed = original_data.replace(b"+    return quantity * unit\n",
+                                        b"+    return quantity * unit + 1\n")
+        self.assertNotEqual(changed, original_data)
+        (store.root / original_ref.path).write_bytes(changed)
+        new_ref = replace(original_ref, sha256=hashlib.sha256(changed).hexdigest(), size_bytes=len(changed))
+        forged = replace(manifest, artifacts=tuple(new_ref if ref.path == original_ref.path else ref for ref in manifest.artifacts))
+        self.assertTrue(store.verify(new_ref), "artifact metadata deliberately matches the tampered bytes")
+        with self.assertRaisesRegex(ValueError, "does not reproduce"):
+            validate_manifest_artifacts(forged, store)
+        self.assert_source_untouched()
+
+    def test_rehashed_step_patch_tamper_breaks_checkpoint_replay(self):
+        from dataclasses import replace
+        import hashlib
+        manifest, _, _ = self.run_fixture()
+        store = ArtifactStore(manifest.run_id, str(self.root / "evidence"))
+        ref = next(ref for ref in manifest.artifacts if ref.path == "write/step-1.patch")
+        data = store.read(ref).replace(b"+    return quantity * unit\n",
+                                      b"+    return quantity * unit + 1\n")
+        (store.root / ref.path).write_bytes(data)
+        changed_ref = replace(ref, sha256=hashlib.sha256(data).hexdigest(), size_bytes=len(data))
+        forged = replace(manifest, artifacts=tuple(changed_ref if item.path == ref.path else item for item in manifest.artifacts))
+        with self.assertRaisesRegex(ValueError, "step bytes/modes"):
+            validate_manifest_artifacts(forged, store)
+        self.assert_source_untouched()
+
+    def test_failed_restore_records_recovery_path_without_erasing_staging(self):
+        import shutil
+        import anti_slop_core.checkpoint as checkpoint_module
+        original_copy = checkpoint_module._copy_contents
+
+        def failing_restore(source, destination):
+            if Path(destination) == self.root / "snapshot":
+                raise OSError("fixture restoration denied")
+            return original_copy(source, destination)
+
+        with patch.object(checkpoint_module, "_copy_contents", side_effect=failing_restore):
+            manifest, manifest_path, _ = self.run_fixture(steps=[step(changes=[change(after=REGRESSION)])])
+        self.assertEqual(manifest.status, ManifestStatus.STOPPED)
+        audit = json.loads((manifest_path.parent / "write/evidence.json").read_text())
+        recovery = Path(audit["recovery"]["path"])
+        self.addCleanup(shutil.rmtree, recovery, ignore_errors=True)
+        self.assertEqual((recovery / "calc.py").read_text(), ORIGINAL)
+        self.assertIn("fixture restoration denied", audit["recovery"]["reason"])
+        self.assertFalse((manifest_path.parent / "write/final.patch").exists())
+        self.assert_source_untouched()
+
     def test_repair_mode_uses_the_same_baseline_and_oracle_gates(self):
         manifest, _, _ = self.run_fixture(mode="repair-slop")
         self.assertEqual(manifest.status, ManifestStatus.PASSED)
@@ -258,7 +320,7 @@ class WriteAcceptanceTests(unittest.TestCase):
         subprocess.run(["git", "-C", str(self.source), "add", "mutator.py"], check=True)
         subprocess.run(["git", "-C", str(self.source), "commit", "-qm", "mutating verifier fixture"], check=True)
         self.original_tree = tree_identity(self.source)
-        checks = [{"id": "contract", "argv": ["/usr/bin/python3", "-B", "mutator.py"]}]
+        checks = [{"id": "contract", "argv": [sys.executable, "-B", "mutator.py"]}]
         manifest, _, _ = self.run_fixture(checks=checks)
         self.assertNotEqual(manifest.status, ManifestStatus.PASSED)
         self.assertEqual((self.root / "snapshot/calc.py").read_text(), ORIGINAL)
@@ -270,7 +332,7 @@ class WriteAcceptanceTests(unittest.TestCase):
         subprocess.run(["git", "-C", str(self.source), "add", "mutator.py"], check=True)
         subprocess.run(["git", "-C", str(self.source), "commit", "-qm", "directory-mutating verifier fixture"], check=True)
         self.original_tree = tree_identity(self.source)
-        checks = [{"id": "contract", "argv": ["/usr/bin/python3", "-B", "mutator.py"]}]
+        checks = [{"id": "contract", "argv": [sys.executable, "-B", "mutator.py"]}]
         manifest, _, _ = self.run_fixture(checks=checks)
         self.assertNotEqual(manifest.status, ManifestStatus.PASSED)
         self.assertFalse((self.root / "snapshot/unreviewed").exists())
@@ -286,6 +348,48 @@ class WriteAcceptanceTests(unittest.TestCase):
                                           steps=[step("weaken-verifier", [change("contract.py", CONTRACT, "print('passed')\n")])])
         self.assertNotEqual(manifest.status, ManifestStatus.PASSED)
         self.assertEqual((self.root / "snapshot/contract.py").read_text(), CONTRACT)
+        self.assert_source_untouched()
+
+    def test_transitive_relative_assertion_helper_cannot_be_allowed_or_tampered(self):
+        import subprocess
+        helper = "from calc import price\n\ndef verify():\n    assert price(3, 4) == 12\n    assert price(0, 9) == 0\n"
+        contract = "from oracle_pkg.bridge import verify\nverify()\n"
+        (self.source / "oracle_pkg").mkdir()
+        (self.source / "oracle_pkg/__init__.py").write_text("# oracle package\n")
+        (self.source / "oracle_pkg/bridge.py").write_text("from .assertions import verify\n")
+        (self.source / "oracle_pkg/assertions.py").write_text(helper)
+        (self.source / "contract.py").write_text(contract)
+        subprocess.run(["git", "-C", str(self.source), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(self.source), "commit", "-qm", "transitive helper oracle"], check=True)
+        self.original_tree = tree_identity(self.source)
+        manifest, manifest_path, _ = self.run_fixture(
+            allowed_paths=["calc.py", "oracle_pkg/assertions.py"],
+            steps=[step(changes=[change(after=REGRESSION),
+                                change("oracle_pkg/assertions.py", helper, "def verify():\n    pass\n")])],
+            limits={"max_files": 2, "max_changed_lines": 40, "max_steps": 1})
+        self.assertEqual(manifest.status, ManifestStatus.STOPPED)
+        self.assertEqual(manifest.checks, ())
+        audit = json.loads((manifest_path.parent / "write/evidence.json").read_text())
+        self.assertIn("oracle_pkg/assertions.py", audit["effective_protected_paths"])
+        self.assertIn("oracle_pkg/__init__.py", audit["effective_protected_paths"])
+        self.assertNotIn("calc.py", audit["effective_protected_paths"])
+        self.assertEqual((self.root / "snapshot/oracle_pkg/assertions.py").read_text(), helper)
+        self.assert_source_untouched()
+
+    def test_imported_assertion_helper_does_not_freeze_independent_production(self):
+        import subprocess
+        helper = "from calc import price\n\ndef verify():\n    assert price(3, 4) == 12\n    assert price(0, 9) == 0\n"
+        (self.source / "oracle_helpers.py").write_text(helper)
+        (self.source / "contract.py").write_text("from oracle_helpers import verify\nverify()\n")
+        subprocess.run(["git", "-C", str(self.source), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(self.source), "commit", "-qm", "imported helper oracle"], check=True)
+        self.original_tree = tree_identity(self.source)
+        manifest, manifest_path, _ = self.run_fixture()
+        self.assertEqual(manifest.status, ManifestStatus.PASSED)
+        audit = json.loads((manifest_path.parent / "write/evidence.json").read_text())
+        self.assertIn("oracle_helpers.py", audit["effective_protected_paths"])
+        self.assertNotIn("calc.py", audit["effective_protected_paths"])
+        self.assertEqual((self.root / "snapshot/calc.py").read_text(), SIMPLIFIED)
         self.assert_source_untouched()
 
     def test_non_deterministic_check_is_not_relabelled_green(self):
