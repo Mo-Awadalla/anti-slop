@@ -32,7 +32,9 @@ See [`references/p1-p3-roadmap.md`](references/p1-p3-roadmap.md) for the current
 - `scripts/` — diagnostic runner and its implementation.
 - `templates/` — run and finding schemas.
 
-The existing research notes are in [`deep-research-skills`](https://github.com/Mo-Awadalla/deep-research-skills/blob/master/deep-research-briefs/references/anti-slop-skill-blueprint-notes.md).
+## Research artifacts
+
+The preserved practitioner research and implementation blueprint are in [`research/`](research/README.md). The concise skill-blueprint notes are in [`deep-research-skills`](https://github.com/Mo-Awadalla/deep-research-skills/blob/master/deep-research-briefs/references/anti-slop-skill-blueprint-notes.md). The earlier full research-report files were not present in the cache when this repository was prepared; see the research index for that gap.
 
 ## CLI quick check
 
