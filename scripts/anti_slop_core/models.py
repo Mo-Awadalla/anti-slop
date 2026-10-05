@@ -1,4 +1,4 @@
-"""Frozen data models for the anti-slop P0 vertical slice."""
+"""Frozen contracts for deterministic diagnosis and bounded write runs."""
 
 from __future__ import annotations
 
@@ -64,11 +64,40 @@ class CheckSpec:
 
 
 @dataclass(frozen=True)
+class DiffLimits:
+    max_files: int
+    max_changed_lines: int
+    max_steps: int
+
+
+@dataclass(frozen=True)
+class PatchChange:
+    path: str
+    before_sha256: Optional[str]
+    content: Optional[str]
+
+
+@dataclass(frozen=True)
+class PatchStep:
+    id: str
+    description: str
+    changes: Tuple[PatchChange, ...]
+
+
+@dataclass(frozen=True)
 class RunSpec:
     repo_path: str
     snapshot_root: str
     mode: RunMode = RunMode.DIAGNOSE
     checks: Tuple[CheckSpec, ...] = field(default_factory=tuple)
+    objective: Optional[str] = None
+    behavior_budget: Optional[str] = None
+    allowed_paths: Tuple[str, ...] = field(default_factory=tuple)
+    oracle_checks: Tuple[str, ...] = field(default_factory=tuple)
+    oracle_paths: Tuple[str, ...] = field(default_factory=tuple)
+    protected_paths: Tuple[str, ...] = field(default_factory=tuple)
+    limits: Optional[DiffLimits] = None
+    steps: Tuple[PatchStep, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -103,12 +132,7 @@ class CheckRecord:
 
 @dataclass(frozen=True)
 class Finding:
-    """A finding has nine required semantic fields.
-
-    The required fields are id, title, source, evidence_refs, severity, impact,
-    confidence, recommended_action, and counterargument.  Location fields are
-    optional convenience metadata.
-    """
+    """Nine semantic fields, plus optional source location metadata."""
 
     id: str
     title: str
@@ -125,12 +149,10 @@ class Finding:
 
     @property
     def check_id(self) -> str:
-        """Compatibility view: a check source is the check identifier."""
         return self.source
 
     @property
     def evidence(self) -> Tuple[str, ...]:
-        """Compatibility view for early Task 2 callers."""
         return self.evidence_refs
 
     @property

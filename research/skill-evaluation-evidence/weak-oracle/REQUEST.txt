@@ -1,0 +1,1 @@
+Assess the generated multiplication test before relying on it to call a refactor safe. Multiplication means the mathematical product. Replace a weak oracle with independent cases and repair any demonstrated local defect.

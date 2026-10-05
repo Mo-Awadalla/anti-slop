@@ -1,0 +1,27 @@
+test_logged_out_owner_denied (test_module.PermissionTests.test_logged_out_owner_denied) ... FAIL
+test_owner_allowed (test_module.PermissionTests.test_owner_allowed) ... ok
+test_stranger_denied (test_module.PermissionTests.test_stranger_denied) ... FAIL
+test_title_unchanged (test_module.PermissionTests.test_title_unchanged) ... ok
+
+======================================================================
+FAIL: test_logged_out_owner_denied (test_module.PermissionTests.test_logged_out_owner_denied)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/anti-slop-skill-evaluation/repair/test_module.py", line 6, in test_logged_out_owner_denied
+    def test_logged_out_owner_denied(self): self.assertFalse(can_read({"id":"a", "authenticated":False}, {"owner":"a"}))
+                                            ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_stranger_denied (test_module.PermissionTests.test_stranger_denied)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/anti-slop-skill-evaluation/repair/test_module.py", line 5, in test_stranger_denied
+    def test_stranger_denied(self): self.assertFalse(can_read({"id":"b", "authenticated":True}, {"owner":"a"}))
+                                    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.000s
+
+FAILED (failures=2)

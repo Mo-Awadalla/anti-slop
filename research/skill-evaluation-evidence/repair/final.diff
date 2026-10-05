@@ -1,0 +1,9 @@
+--- module.before
++++ module.py
+@@ -1,5 +1,5 @@
+ def can_read(user, record):
+-    return user["id"] == record["owner"] or user.get("authenticated", False)
++    return user["id"] == record["owner"] and user.get("authenticated", False)
+ 
+ def title(record):
+     return record["title"]

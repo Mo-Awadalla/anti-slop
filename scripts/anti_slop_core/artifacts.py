@@ -34,13 +34,29 @@ class ArtifactStore:
             raise ArtifactError(f"run already exists: {self.run_id}") from exc
         return self.root
 
+    def assert_outside(self, *roots: str | Path) -> None:
+        """Reject artifact destinations that would mutate a source or snapshot."""
+        destination = self.root.resolve()
+        for root in roots:
+            boundary = Path(root).resolve()
+            if destination == boundary or boundary in destination.parents:
+                raise ArtifactError("artifact directory must be outside the source and snapshot")
+
     def _safe_path(self, relative: str) -> Path:
         if not isinstance(relative, str) or not relative or os.path.isabs(relative) or "\\" in relative:
             raise ArtifactError("artifact path must be relative")
         parts = relative.split("/")
         if any(part in ("", ".", "..") for part in parts):
             raise ArtifactError("artifact path contains traversal")
-        candidate = (self.root / relative).resolve(strict=False)
+        candidate = self.root / relative
+        cursor = self.root
+        if cursor.is_symlink():
+            raise ArtifactError("artifact root must not be a symlink")
+        for part in parts:
+            cursor = cursor / part
+            if cursor.is_symlink():
+                raise ArtifactError("artifact path must not contain symlinks")
+        candidate = candidate.resolve(strict=False)
         try:
             inside = os.path.commonpath((str(self.root.resolve()), str(candidate))) == str(self.root.resolve())
         except ValueError:
@@ -63,6 +79,8 @@ class ArtifactStore:
         return ArtifactRef(relative, digest, len(data), media_type)
 
     def verify(self, ref: ArtifactRef) -> bool:
+        if ref.sha256 is None or ref.size_bytes is None:
+            return False
         try:
             target = self._safe_path(ref.path)
             if not target.is_file() or target.is_symlink():

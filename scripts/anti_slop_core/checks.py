@@ -18,11 +18,16 @@ def _safe_id(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
 
 
-def _runner_available(argv: tuple[str, ...]) -> bool:
+def _runner_available(argv: tuple[str, ...], sandbox=None, cwd: str = ".") -> bool:
     executable = argv[0]
+    if "/" in executable and not os.path.isabs(executable) and sandbox is not None:
+        from pathlib import Path
+        base = Path(cwd) if os.path.isabs(cwd) else Path(sandbox.workspace) / cwd
+        candidate = base / executable
+        return candidate.is_file() and os.access(candidate, os.X_OK)
     if os.path.isabs(executable):
         return os.path.isfile(executable) and os.access(executable, os.X_OK)
-    return shutil.which(executable, path="/usr/local/bin:/usr/bin:/bin") is not None
+    return shutil.which(executable, path="/usr/bin:/bin") is not None
 
 
 def _artifacts(store: ArtifactStore, check_id: str, number: int, stdout: bytes, stderr: bytes) -> tuple[ArtifactRef, ArtifactRef]:
@@ -35,7 +40,7 @@ def run_check(spec: CheckSpec, sandbox: BubblewrapSandbox, store: ArtifactStore)
     artifacts: list[ArtifactRef] = []
     count = 2 if spec.rerun else 1
     for number in range(1, count + 1):
-        if not _runner_available(spec.argv):
+        if not _runner_available(spec.argv, sandbox, spec.cwd):
             stdout, stderr, status, code = b"", f"runner unavailable: {spec.argv[0]}\n".encode(), AttemptStatus.UNAVAILABLE, None
             start = time.monotonic()
         else:
@@ -59,10 +64,12 @@ def run_check(spec: CheckSpec, sandbox: BubblewrapSandbox, store: ArtifactStore)
                 code, status = None, AttemptStatus.FAILED
             except SandboxUnavailable as exc:
                 stdout, stderr, code, status = b"", (str(exc) + "\n").encode(), None, AttemptStatus.UNAVAILABLE
+            except (OSError, ValueError) as exc:
+                stdout, stderr, code, status = b"", (str(exc) + "\n").encode(), None, AttemptStatus.BLOCKED
         duration = (time.monotonic() - start) * 1000
         stdout_ref, stderr_ref = _artifacts(store, spec.id, number, stdout, stderr)
         artifacts.extend((stdout_ref, stderr_ref))
-        attempts.append(CommandAttempt(spec.id, spec.argv, spec.cwd, status, code, duration, stdout_ref, stderr_ref, True))
+        attempts.append(CommandAttempt(spec.id, spec.argv, spec.cwd, status, code, duration, stdout_ref, stderr_ref, status not in (AttemptStatus.UNAVAILABLE, AttemptStatus.BLOCKED)))
     return CheckRecord(spec.id, _derive_record_status(attempts), tuple(attempts), (), spec.required), tuple(artifacts)
 
 
@@ -78,7 +85,7 @@ def unavailable_checks(checks: Iterable[CheckSpec], store: ArtifactStore, reason
     records = []
     artifacts = []
     for spec in checks:
-        stdout_ref, stderr_ref = _artifacts(store, spec.id, 1, b"", (reason + "\\n").encode())
+        stdout_ref, stderr_ref = _artifacts(store, spec.id, 1, b"", (reason + "\n").encode())
         attempt = CommandAttempt(spec.id, spec.argv, spec.cwd, AttemptStatus.UNAVAILABLE, None, 0.0, stdout_ref, stderr_ref, False)
         records.append(CheckRecord(spec.id, _derive_record_status((attempt,)), (attempt,), (), spec.required))
         artifacts.extend((stdout_ref, stderr_ref))

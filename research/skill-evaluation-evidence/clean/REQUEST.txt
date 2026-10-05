@@ -1,0 +1,1 @@
+Diagnose customer_report for unnecessary complexity. There is no local rule requiring another naming or formatting style. Preserve the fixed output order and missing-field error contract. Do not edit for personal style.

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://hermes.local/anti-slop/findings.schema.json",
   "title": "Anti-Slop Findings",
-  "description": "Validated diagnostic findings. P0 validates supplied findings and evidence; it does not generate findings or mutate repositories.",
+  "description": "Evidence-backed findings with nine required semantic fields. The runner validates supplied findings; project adapters do not generate diagnoses from metrics alone.",
   "type": "array",
   "items": {
     "type": "object",
@@ -19,22 +19,72 @@
       "counterargument"
     ],
     "properties": {
-      "id": {"type": "string", "minLength": 1},
-      "title": {"type": "string", "minLength": 1},
-      "source": {"type": "string", "minLength": 1},
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1
+      },
+      "source": {
+        "type": "string",
+        "minLength": 1
+      },
       "evidence_refs": {
         "type": "array",
         "minItems": 1,
-        "items": {"type": "string", "minLength": 1}
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
       },
-      "severity": {"enum": ["info", "low", "medium", "high", "critical"]},
-      "impact": {"type": "string", "minLength": 1},
-      "confidence": {"type": "number", "minimum": 0, "maximum": 1},
-      "recommended_action": {"type": "string", "minLength": 1},
-      "counterargument": {"type": "string", "minLength": 1},
-      "path": {"type": ["string", "null"]},
-      "line": {"type": ["integer", "null"], "minimum": 1},
-      "column": {"type": ["integer", "null"], "minimum": 1}
+      "severity": {
+        "enum": [
+          "info",
+          "low",
+          "medium",
+          "high",
+          "critical"
+        ]
+      },
+      "impact": {
+        "type": "string",
+        "minLength": 1
+      },
+      "confidence": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "recommended_action": {
+        "type": "string",
+        "minLength": 1
+      },
+      "counterargument": {
+        "type": "string",
+        "minLength": 1
+      },
+      "path": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "line": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "minimum": 1
+      },
+      "column": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "minimum": 1
+      }
     }
   }
 }
