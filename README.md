@@ -1,49 +1,38 @@
 # Anti-Slop
 
-A Hermes skill for finding unjustified code complexity and quality risks without mistaking personal style for engineering evidence.
+An agent skill for preventing unnecessary complexity, diagnosing code-quality risks, and performing bounded, evidence-backed refactoring or repair. It judges code against project intent and behavior, with counterarguments and meaningful checks; AI authorship or disliked style is not evidence of harm.
 
-## Status
+The skill is the main product. Read [`SKILL.md`](SKILL.md) for the workflow and [`references/agent-workflow.md`](references/agent-workflow.md) for code-changing work. Guidance works with ordinary repository tools. The optional Python runner provides reproducible evidence and verifies supplied changes in an isolated snapshot.
 
-**In progress.** The current implementation is a read-only diagnostic foundation, not the finished anti-slop workflow. It includes a Hermes skill, a Python runner, evidence schemas, sandboxing, and finding validation. The public CLI currently exposes `diagnose` and `validate-findings`; it does not edit code.
+## Implemented workflows
 
-The main unfinished work is to make the agent-facing skill the product: guide useful, contextual code-quality judgment during implementation and review, while keeping the runner as optional support. There is no automatic finding generation, no new-code prevention workflow, and no `refactor` or `repair-slop` mode yet.
+- **Prevent:** preserve requested behavior and existing boundaries; inspect generated additions for unjustified cost.
+- **Diagnose:** report contextual risks without editing, distinguishing style, maintenance, and behavior/security evidence.
+- **Refactor:** make coherent behavior-preserving changes with independent oracles and recovery points.
+- **Repair:** verify the intended correction and unaffected contracts, retaining pre-existing failures and uncertainty.
 
-## What to finish next
+The runner exposes `diagnose`, `refactor`, `repair-slop`, and `validate-findings`. Write modes consume explicit full-text change steps, check a green baseline and each step, enforce path/diff bounds and immutable oracles, recover a failed step, and export a verified reviewable patch after completion. Every mode leaves the source checkout unchanged.
 
-1. Refocus `SKILL.md` around practical agent behavior: inspect context, distinguish style from real cost or risk, give evidence-backed findings with counterarguments, and preserve required behavior.
-2. Pilot the workflow on a real repository. Judge whether the findings are useful, whether false positives are controlled, and how much user effort the workflow takes.
-3. Rework the roadmap from those results. Consider a fast path or reusable repository profiles only if the pilot shows they save time without weakening the result.
-4. Treat code-changing refactor or repair modes as separate future work. Define authorization, scope, behavior-preservation evidence, recovery, and end-to-end acceptance before exposing them.
+Runner `repair-slop` currently handles preservation only. Intentional behavior changes and repairs starting with a failing regression check use the authorized direct agent workflow; the runner does not claim to support that contract. It also does not generate fixes or prove coverage adequacy automatically.
 
-See [`references/p1-p3-roadmap.md`](references/p1-p3-roadmap.md) for the current handoff. The old staged P1–P3 sequence was stale because the P0 runner already included sandboxing, evidence capture, and manifest handling.
+## Use
 
-## Current boundary
-
-- Read-only with respect to the target repository.
-- Checks must be explicitly specified; repository text is not executed as a command source.
-- No universal “slop score” or style-only findings.
-- No automatic edits, refactoring, or repair.
-- No unsandboxed fallback when required isolation is unavailable.
-
-## Repository layout
-
-- `SKILL.md` — agent workflow and safety boundary.
-- `references/` — evidence baseline, operating contract, and remaining-work roadmap.
-- `scripts/` — diagnostic runner and its implementation.
-- `templates/` — run and finding schemas.
-
-## Research artifacts
-
-The preserved practitioner research and implementation blueprint are in [`research/`](research/README.md). The concise skill-blueprint notes are in [`deep-research-skills`](https://github.com/Mo-Awadalla/deep-research-skills/blob/master/deep-research-briefs/references/anti-slop-skill-blueprint-notes.md). The earlier full research-report files were not present in the cache when this repository was prepared; see the research index for that gap.
-
-## CLI quick check
-
-From the repository root:
+Place this repository's skill folder where your agent discovers skills, or invoke its instructions explicitly. No Python package installation is needed. The agent guidance is portable; runner execution requires Linux, Git, and working Bubblewrap.
 
 ```bash
 python3 scripts/run.py --help
-python3 scripts/run.py diagnose --help
-python3 scripts/run.py validate-findings --help
+python3 scripts/run.py diagnose --spec run.json
+python3 scripts/run.py refactor --spec run.json
+python3 scripts/run.py repair-slop --spec run.json
+python3 scripts/run.py validate-findings --manifest manifest.json --findings findings.json
 ```
 
-The runner uses Python's standard library. A real diagnosis also requires Git and Linux Bubblewrap (`bwrap`). See `SKILL.md` and `references/operating-contract.md` before using it.
+Read the [`operating contract`](references/operating-contract.md) before preparing a spec. It explains inputs, artifact locations, execution limits, and exit codes. Runtime validation is authoritative; JSON schemas live in `templates/`.
+
+## Validation and research
+
+The remaining roadmap's agent workflow, real-repository pilot, and bounded write-mode phases have been implemented. [`Acceptance results`](research/acceptance-results.md) records tested behavior; [`pilot results`](research/pilot-results.md) documents useful findings on the original repository and the observed friction. [`Skill evaluation`](research/skill-evaluation.md) records qualitative clean-control, prevention, repair, and weak-oracle decisions.
+
+The preserved practitioner research and blueprint remain unchanged in [`research/`](research/README.md). They are rationale, not an implemented-feature checklist or proof that the skill improves agent outcomes. Missing original reports and unperformed paired model/corpus effectiveness studies remain explicit. No universal slop score is used.
+
+From `scripts/`, run `python3 -m unittest discover -s tests -v`. Real sandbox tests explicitly skip when isolation is unavailable; those skips do not establish isolation. See the operating contract for compilation and real-run checks.

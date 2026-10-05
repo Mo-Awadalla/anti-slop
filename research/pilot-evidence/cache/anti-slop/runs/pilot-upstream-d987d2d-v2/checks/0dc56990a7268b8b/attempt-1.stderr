@@ -1,0 +1,34 @@
+test_asserted_pass_status_is_rejected_when_checks_do_not_pass (tests.test_schema.SchemaValidationTests.test_asserted_pass_status_is_rejected_when_checks_do_not_pass) ... ok
+test_cwd_must_stay_inside_snapshot_root (tests.test_schema.SchemaValidationTests.test_cwd_must_stay_inside_snapshot_root) ... ok
+test_duplicate_check_ids_are_rejected (tests.test_schema.SchemaValidationTests.test_duplicate_check_ids_are_rejected) ... ok
+test_each_public_model_loader_validates_its_json_shape (tests.test_schema.SchemaValidationTests.test_each_public_model_loader_validates_its_json_shape) ... ok
+test_empty_argv_is_rejected (tests.test_schema.SchemaValidationTests.test_empty_argv_is_rejected) ... ok
+test_invalid_manifest_status_is_rejected (tests.test_schema.SchemaValidationTests.test_invalid_manifest_status_is_rejected) ... ok
+test_load_run_spec_accepts_diagnose_contract (tests.test_schema.SchemaValidationTests.test_load_run_spec_accepts_diagnose_contract) ... ok
+test_manifest_loader_builds_nested_frozen_models (tests.test_schema.SchemaValidationTests.test_manifest_loader_builds_nested_frozen_models) ... ok
+test_models_are_frozen_dataclasses (tests.test_schema.SchemaValidationTests.test_models_are_frozen_dataclasses) ... ok
+test_p0_rejects_non_diagnose_mode (tests.test_schema.SchemaValidationTests.test_p0_rejects_non_diagnose_mode) ... ok
+test_relative_repo_paths_are_rejected (tests.test_schema.SchemaValidationTests.test_relative_repo_paths_are_rejected) ... ok
+test_shell_forms_are_rejected (tests.test_schema.SchemaValidationTests.test_shell_forms_are_rejected) ... ok
+test_shell_true_is_rejected (tests.test_schema.SchemaValidationTests.test_shell_true_is_rejected) ... ok
+test_type_mismatches_are_rejected (tests.test_schema.SchemaValidationTests.test_type_mismatches_are_rejected) ... ok
+test_unknown_keys_are_rejected (tests.test_schema.SchemaValidationTests.test_unknown_keys_are_rejected) ... ok
+test_artifact_paths_are_exclusive_and_traversal_safe (tests.test_artifacts_manifest.ArtifactIntegrityTests.test_artifact_paths_are_exclusive_and_traversal_safe) ... ok
+test_artifact_round_trip_and_tamper_detection (tests.test_artifacts_manifest.ArtifactIntegrityTests.test_artifact_round_trip_and_tamper_detection) ... ok
+test_manifest_artifact_tampering_invalidates_pass (tests.test_artifacts_manifest.ManifestIntegrityTests.test_manifest_artifact_tampering_invalidates_pass) ... ok
+test_pass_requires_both_artifacts_in_verified_set (tests.test_artifacts_manifest.ManifestIntegrityTests.test_pass_requires_both_artifacts_in_verified_set) ... ok
+test_stable_zero_attempt_with_verified_artifacts_passes (tests.test_artifacts_manifest.ManifestIntegrityTests.test_stable_zero_attempt_with_verified_artifacts_passes) ... ok
+test_unknown_repository_gets_reduced_generic_capabilities (tests.test_findings_report_checkpoint.AdapterTests.test_unknown_repository_gets_reduced_generic_capabilities) ... ok
+test_isolated_checkpoint_restores_files_without_touching_git_metadata (tests.test_findings_report_checkpoint.CheckpointTests.test_isolated_checkpoint_restores_files_without_touching_git_metadata) ... ok
+test_no_edit_report_is_explicit (tests.test_findings_report_checkpoint.FindingAndReportTests.test_no_edit_report_is_explicit) ... ok
+test_vague_finding_action_is_rejected (tests.test_findings_report_checkpoint.FindingAndReportTests.test_vague_finding_action_is_rejected) ... ok
+test_public_parser_accepts_only_p0_commands (tests.test_cli.CliParserP0Tests.test_public_parser_accepts_only_p0_commands) ... usage: anti-slop [-h] {diagnose,validate-findings} ...
+anti-slop: error: argument command: invalid choice: 'refactor' (choose from 'diagnose', 'validate-findings')
+usage: anti-slop [-h] {diagnose,validate-findings} ...
+anti-slop: error: argument command: invalid choice: 'repair-slop' (choose from 'diagnose', 'validate-findings')
+ok
+
+----------------------------------------------------------------------
+Ran 25 tests in 0.014s
+
+OK

@@ -1,0 +1,11 @@
+test_discount (test_module.TotalTests.test_discount) ... ok
+test_empty (test_module.TotalTests.test_empty) ... ok
+test_excess_rate (test_module.TotalTests.test_excess_rate) ... ok
+test_free (test_module.TotalTests.test_free) ... ok
+test_negative_rate (test_module.TotalTests.test_negative_rate) ... ok
+test_total (test_module.TotalTests.test_total) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.000s
+
+OK

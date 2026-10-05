@@ -1,0 +1,9 @@
+{
+  "status": "blocked",
+  "check_status": "unavailable",
+  "source_unchanged": true,
+  "host_fallback_executed": false,
+  "snapshot_check_executed": false,
+  "manifest": "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/anti-slop-skill-evaluation/unavailable/artifacts/cache/anti-slop/runs/skill-evaluation-unavailable/manifest.json",
+  "report": "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/anti-slop-skill-evaluation/unavailable/artifacts/cache/anti-slop/runs/skill-evaluation-unavailable/report.md"
+}

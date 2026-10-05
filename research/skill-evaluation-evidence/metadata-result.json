@@ -1,0 +1,21 @@
+{
+  "installed_loader": "/var/home/mohamed/.hermes/installs/c249fc0142f56fb9/environments/3ffe99e1010b4dbd8dbaced628af7b9f/workspace/agent/skill_utils.py",
+  "description_length": 60,
+  "prompt_description": "Prevent code slop; diagnose, refactor, repair with evidence.",
+  "description_truncated": false,
+  "name": "anti-slop",
+  "runner_platforms": [
+    "linux"
+  ],
+  "hermes_tags": [
+    "software-development",
+    "code-quality",
+    "anti-slop"
+  ],
+  "automatic_discovery_disabled": false,
+  "platform_gate": {
+    "linux": true,
+    "darwin": true,
+    "win32": true
+  }
+}

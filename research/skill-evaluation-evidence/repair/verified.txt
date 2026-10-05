@@ -1,0 +1,9 @@
+test_logged_out_owner_denied (test_module.PermissionTests.test_logged_out_owner_denied) ... ok
+test_owner_allowed (test_module.PermissionTests.test_owner_allowed) ... ok
+test_stranger_denied (test_module.PermissionTests.test_stranger_denied) ... ok
+test_title_unchanged (test_module.PermissionTests.test_title_unchanged) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.000s
+
+OK

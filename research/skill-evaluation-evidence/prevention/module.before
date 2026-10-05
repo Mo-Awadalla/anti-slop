@@ -1,0 +1,2 @@
+def receipt_total(prices):
+    return sum(prices)

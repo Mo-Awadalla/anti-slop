@@ -30,14 +30,14 @@ def _persist(store: ArtifactStore, manifest: RunManifest, adapter_summary: dict 
 def run_diagnose(spec: RunSpec, *, hermes_home: str | None = None, run_id: str | None = None) -> tuple[RunManifest, Path, Path]:
     run_id = run_id or _new_run_id()
     store = ArtifactStore(run_id, hermes_home)
+    discovery = discover(spec.repo_path)
+    store.assert_outside(discovery.git_root, spec.snapshot_root)
     store.create()
-    discovery = None
     records = ()
     artifacts = ()
     stop_reason = None
     adapter_summary = None
     try:
-        discovery = discover(spec.repo_path)
         if discovery.dirty:
             raise DirtySourceError("source repository is dirty; execution stopped before checks")
         before = source_fingerprint(discovery.git_root)

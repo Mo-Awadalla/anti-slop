@@ -2,9 +2,11 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from anti_slop_core.diagnose import run_diagnose
 from anti_slop_core.models import CheckSpec, CheckStatus, RunMode, RunSpec, ManifestStatus
+from tests.helpers import LocalFixtureSandbox, tree_identity
 
 
 def make_repo(root: Path) -> None:
@@ -21,6 +23,11 @@ def spec(source: Path, snapshot: Path, *checks: CheckSpec) -> RunSpec:
 
 
 class DiagnoseAcceptanceTests(unittest.TestCase):
+    def setUp(self):
+        runner = patch("anti_slop_core.diagnose.BubblewrapSandbox", LocalFixtureSandbox)
+        runner.start()
+        self.addCleanup(runner.stop)
+
     def test_red_baseline_is_failed_not_fixed(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -55,7 +62,7 @@ class DiagnoseAcceptanceTests(unittest.TestCase):
             make_repo(source)
             manifest, _, _ = run_diagnose(
                 spec(source, root / "snapshot", CheckSpec(
-                    "flaky", ("/bin/sh", "-c", "if test -e .marker; then exit 1; else touch .marker; exit 0; fi"), rerun=True,
+                    "flaky", ("/usr/bin/python3", "-c", "from pathlib import Path; p=Path('.marker'); exists=p.exists(); p.touch(); raise SystemExit(int(exists))"), rerun=True,
                 )),
                 hermes_home=str(root / "hermes"),
             )
@@ -84,16 +91,38 @@ class DiagnoseAcceptanceTests(unittest.TestCase):
             source = root / "source"
             source.mkdir()
             make_repo(source)
-            before = subprocess.check_output(["git", "-C", str(source), "status", "--porcelain"], text=True)
-            head = subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], text=True)
+            before = tree_identity(source)
             manifest, _, report_path = run_diagnose(
                 spec(source, root / "snapshot", CheckSpec("unit", ("/bin/true",))),
                 hermes_home=str(root / "hermes"),
             )
             self.assertEqual(manifest.status, ManifestStatus.PASSED)
             self.assertIn("No edit is correct", report_path.read_text(encoding="utf-8"))
-            self.assertEqual(subprocess.check_output(["git", "-C", str(source), "status", "--porcelain"], text=True), before)
-            self.assertEqual(subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], text=True), head)
+            self.assertEqual(tree_identity(source), before)
+
+    def test_missing_sandbox_blocks_instead_of_running_on_host(self):
+        from anti_slop_core.sandbox import SandboxUnavailable
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            source.mkdir()
+            make_repo(source)
+            with patch("anti_slop_core.diagnose.BubblewrapSandbox", side_effect=SandboxUnavailable("fixture unavailable")):
+                manifest, _, _ = run_diagnose(
+                    spec(source, root / "snapshot", CheckSpec("unit", ("/bin/true",))),
+                    hermes_home=str(root / "hermes"),
+                )
+            self.assertEqual(manifest.status, ManifestStatus.BLOCKED)
+            self.assertEqual(manifest.checks[0].status, CheckStatus.UNAVAILABLE)
+
+    def test_no_checks_never_claims_verified_pass(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            source.mkdir()
+            make_repo(source)
+            manifest, _, _ = run_diagnose(spec(source, root / "snapshot"), hermes_home=str(root / "hermes"))
+            self.assertNotEqual(manifest.status, ManifestStatus.PASSED)
 
 
 if __name__ == "__main__":

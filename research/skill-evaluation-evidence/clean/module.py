@@ -1,0 +1,15 @@
+def customer_report(customer):
+    lines = []
+    lines.append("id=" + customer["id"])
+    lines.append("name=" + customer["name"])
+    lines.append("city=" + customer["city"])
+    lines.append("country=" + customer["country"])
+    lines.append("email=" + customer["email"])
+    lines.append("phone=" + customer["phone"])
+    lines.append("plan=" + customer["plan"])
+    lines.append("language=" + customer["language"])
+    lines.append("timezone=" + customer["timezone"])
+    lines.append("status=" + customer["status"])
+    lines.append("created=" + customer["created"])
+    lines.append("updated=" + customer["updated"])
+    return "\n".join(lines)

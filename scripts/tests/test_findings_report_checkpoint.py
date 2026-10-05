@@ -8,8 +8,11 @@ from anti_slop_core.checkpoint import create_checkpoint
 from anti_slop_core.findings import validate_findings
 from anti_slop_core.models import (
     ArtifactRef,
+    AttemptStatus,
     CheckRecord,
     CheckStatus,
+    CommandAttempt,
+    DiscoveryInfo,
     Finding,
     FindingSeverity,
     ManifestStatus,
@@ -23,10 +26,12 @@ from anti_slop_core.schema import SchemaError
 class FindingAndReportTests(unittest.TestCase):
     def _manifest(self):
         artifact = ArtifactRef("checks/unit.stdout", "a" * 64, 0, "text/plain")
-        check = CheckRecord("unit", CheckStatus.PASSED, (), ())
+        stderr = ArtifactRef("checks/unit.stderr", "b" * 64, 0, "text/plain")
+        attempt = CommandAttempt("unit", ("true",), ".", AttemptStatus.PASSED, 0, 1.0, artifact, stderr, True)
+        check = CheckRecord("unit", CheckStatus.PASSED, (attempt,), ())
         return RunManifest(
             "run-test", RunMode.DIAGNOSE, "/repo", "/snapshot",
-            ManifestStatus.PASSED, (check,), (), (artifact,), None, None,
+            ManifestStatus.PASSED, (check,), (), (artifact, stderr), DiscoveryInfo("/repo", "a" * 40, "main", False), None,
         )
 
     def test_vague_finding_action_is_rejected(self):
@@ -43,6 +48,22 @@ class FindingAndReportTests(unittest.TestCase):
         report = render_report(self._manifest())
         self.assertIn("No edit is correct", report)
         self.assertIn("Evidence integrity", report)
+
+    def test_asserted_pass_without_attempts_does_not_get_no_edit_endorsement(self):
+        from dataclasses import replace
+        manifest = self._manifest()
+        manifest = replace(manifest, checks=(replace(manifest.checks[0], attempts=()),))
+        self.assertNotIn("No edit is correct", render_report(manifest))
+
+    def test_finding_cannot_cite_another_checks_capture(self):
+        from dataclasses import replace
+        manifest = self._manifest()
+        other_ref = ArtifactRef("checks/other.stdout", "c" * 64, 0, "text/plain")
+        manifest = replace(manifest, artifacts=manifest.artifacts + (other_ref,))
+        finding = Finding("f-foreign", "Policy duplication", "unit", (other_ref.path,), FindingSeverity.LOW,
+                          "Duplicated rules may drift", 0.7, "Compare the two discount branches against the contract", "Separate policies might be intentional")
+        with self.assertRaises(SchemaError):
+            validate_findings(manifest, (finding,))
 
 
 class AdapterTests(unittest.TestCase):

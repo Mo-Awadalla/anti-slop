@@ -3,8 +3,8 @@ import unittest
 from anti_slop_core import cli
 
 
-class CliParserP0Tests(unittest.TestCase):
-    def test_public_parser_accepts_only_p0_commands(self):
+class CliParserTests(unittest.TestCase):
+    def test_public_parser_accepts_implemented_modes(self):
         parser = cli.build_parser()
 
         self.assertEqual(parser.parse_args(["diagnose", "--spec", "/tmp/spec.json"]).command, "diagnose")
@@ -14,6 +14,7 @@ class CliParserP0Tests(unittest.TestCase):
         )
         for command in ("refactor", "repair-slop"):
             with self.subTest(command=command):
+                self.assertEqual(parser.parse_args([command, "--spec", "/tmp/spec.json"]).command, command)
                 with self.assertRaises(SystemExit):
                     parser.parse_args([command])
 
