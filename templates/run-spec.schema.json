@@ -62,6 +62,7 @@
       }
     },
     "oracle_paths": {
+      "description": "Immutable oracle files. Static local Python assertion/test/helper imports and package initializers are additionally protected; independent production imports remain editable. Declare dynamic imports, custom helpers without verification signals, and other-language helpers explicitly.",
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,

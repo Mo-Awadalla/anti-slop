@@ -5,6 +5,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 from anti_slop_core.discovery import (
+    DirtySourceError,
+    DiscoveryError,
+    create_snapshot,
     clean_snapshot,
     discover,
     source_fingerprint,
@@ -55,13 +58,125 @@ class DiscoveryAcceptanceTests(unittest.TestCase):
             subprocess.run(["git", "-C", str(source), "checkout", "-qb", "identity-change"], check=True)
             self.assertNotEqual(source_fingerprint(source), before)
 
+    def test_snapshot_excludes_ignored_secrets_but_keeps_tracked_ignored_names(self):
+        import anti_slop_core.discovery as discovery_module
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source"
+            source.mkdir()
+            make_repo(source)
+            (source / ".gitignore").write_text(".env\nprivate/\ntracked secret*\n")
+            tracked_name = "tracked secret\nname.txt"
+            (source / tracked_name).write_text("tracked revision bytes\n")
+            subprocess.run(["git", "-C", str(source), "add", ".gitignore"], check=True)
+            subprocess.run(["git", "-C", str(source), "add", "-f", "--", tracked_name], check=True)
+            subprocess.run(["git", "-C", str(source), "commit", "-qm", "tracked ignored fixture"], check=True)
+            (source / ".env").write_text("TOKEN=must-not-enter-snapshot\n")
+            (source / "private").mkdir()
+            (source / "private/README.md").write_text("python3 leak.py\n")
+            (source / "private/host-link").symlink_to("/etc/passwd")
+            before = source_fingerprint(source)
+            opened = []
+            original_open = discovery_module._open_tracked
+
+            def recording_open(root, relative):
+                opened.append(relative)
+                return original_open(root, relative)
+
+            with patch.object(discovery_module, "_open_tracked", side_effect=recording_open):
+                snapshot = clean_snapshot(source, Path(directory) / "snapshot")
+                self.assertEqual(source_fingerprint(source), before)
+            self.assertNotIn(".env", opened)
+            self.assertFalse(any(path.startswith("private/") for path in opened))
+            self.assertFalse((snapshot / ".env").exists())
+            self.assertFalse((snapshot / "private").exists())
+            self.assertFalse((snapshot / ".git").exists())
+            self.assertEqual((snapshot / tracked_name).read_bytes(), b"tracked revision bytes\n")
+            self.assertNotIn("python3", " ".join(discover(source).candidates))
+            (source / ".env").write_text("TOKEN=changed-secret\n")
+            self.assertEqual(source_fingerprint(source), before)
+
+    def test_untracked_dirty_content_never_enters_a_snapshot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source"
+            source.mkdir()
+            make_repo(source)
+            (source / "untracked.txt").write_text("private draft\n")
+            target = Path(directory) / "snapshot"
+            with self.assertRaises(DirtySourceError):
+                clean_snapshot(source, target)
+            self.assertFalse(target.exists())
+            self.assertEqual((source / "untracked.txt").read_text(), "private draft\n")
+
+    def test_revision_race_removes_only_the_disposable_copy(self):
+        import anti_slop_core.discovery as discovery_module
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source"
+            source.mkdir()
+            make_repo(source)
+            info = discover(source)
+            copy = discovery_module.shutil.copyfileobj
+
+            def switching_copy(*args, **kwargs):
+                copy(*args, **kwargs)
+                subprocess.run(["git", "-C", str(source), "checkout", "-qb", "changed-during-copy"], check=True)
+
+            target = Path(directory) / "snapshot"
+            with patch.object(discovery_module.shutil, "copyfileobj", side_effect=switching_copy):
+                with self.assertRaises(DirtySourceError):
+                    create_snapshot(info, target)
+            self.assertFalse(target.exists())
+            self.assertEqual((source / "README.md").read_text(), "fixture\n")
+
+    def test_stale_head_and_new_dirty_content_abort_snapshot(self):
+        import anti_slop_core.discovery as discovery_module
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source"
+            source.mkdir()
+            make_repo(source)
+            stale = discover(source)
+            subprocess.run(["git", "-C", str(source), "commit", "--allow-empty", "-qm", "new head"], check=True)
+            target = Path(directory) / "snapshot"
+            with self.assertRaises(DirtySourceError):
+                create_snapshot(stale, target)
+            self.assertFalse(target.exists())
+            fresh = discover(source)
+            copy = discovery_module.shutil.copyfileobj
+
+            def dirtying_copy(*args, **kwargs):
+                copy(*args, **kwargs)
+                (source / "private-draft").write_text("user's new draft\n")
+
+            with patch.object(discovery_module.shutil, "copyfileobj", side_effect=dirtying_copy):
+                with self.assertRaises(DirtySourceError):
+                    create_snapshot(fresh, target)
+            self.assertFalse(target.exists())
+            self.assertEqual((source / "private-draft").read_text(), "user's new draft\n")
+            self.assertEqual((source / "README.md").read_text(), "fixture\n")
+
+    def test_tracked_symlinks_are_rejected_without_reading_the_target(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source"
+            source.mkdir()
+            make_repo(source)
+            outside = Path(directory) / "secret"
+            outside.write_text("private\n")
+            (source / "link").symlink_to(outside)
+            subprocess.run(["git", "-C", str(source), "add", "link"], check=True)
+            subprocess.run(["git", "-C", str(source), "commit", "-qm", "symlink fixture"], check=True)
+            with self.assertRaises(DiscoveryError):
+                clean_snapshot(source, Path(directory) / "snapshot")
+            self.assertEqual(outside.read_text(), "private\n")
+
 
 class SandboxBoundaryTests(unittest.TestCase):
     def test_sandbox_command_contains_required_isolation_boundaries(self):
         with tempfile.TemporaryDirectory() as directory:
-            with patch("anti_slop_core.sandbox.shutil.which", return_value="/usr/bin/bwrap"):
+            with patch("anti_slop_core.sandbox.sys.platform", "linux"), patch("anti_slop_core.sandbox.shutil.which", return_value="/usr/bin/bwrap"):
                 command = Sandbox(directory).argv(["/bin/true"])
             self.assertIn("--unshare-net", command)
+            self.assertIn("--unshare-user", command)
+            self.assertIn("--die-with-parent", command)
+            self.assertIn("/anti-slop-resources.py", command)
             self.assertIn("--clearenv", command)
             self.assertIn("--tmpfs", command)
             self.assertIn("/workspace", command)
@@ -77,7 +192,7 @@ class SandboxBoundaryTests(unittest.TestCase):
             outside = Path(directory) / "outside"
             outside.mkdir()
             (workspace / "escape").symlink_to(outside, target_is_directory=True)
-            with patch("anti_slop_core.sandbox.shutil.which", return_value="/usr/bin/bwrap"):
+            with patch("anti_slop_core.sandbox.sys.platform", "linux"), patch("anti_slop_core.sandbox.shutil.which", return_value="/usr/bin/bwrap"):
                 sandbox = Sandbox(workspace)
                 command = sandbox.argv(["/bin/true"], str(subdir))
                 self.assertEqual(command[command.index("--chdir") + 1], "/workspace/subdir")
@@ -87,15 +202,15 @@ class SandboxBoundaryTests(unittest.TestCase):
 
     def test_unspecified_timeout_still_has_a_finite_execution_bound(self):
         with tempfile.TemporaryDirectory() as directory:
-            with patch("anti_slop_core.sandbox.shutil.which", return_value="/usr/bin/bwrap"), patch("anti_slop_core.sandbox.subprocess.run", return_value=subprocess.CompletedProcess([], 0, b"", b"")) as process:
+            with patch("anti_slop_core.sandbox.sys.platform", "linux"), patch("anti_slop_core.sandbox.shutil.which", return_value="/usr/bin/bwrap"), patch("anti_slop_core.sandbox.run_bounded", return_value=subprocess.CompletedProcess([], 0, b"", b"")) as process:
                 Sandbox(directory).run(["/bin/true"], timeout=None)
-            self.assertGreater(process.call_args.kwargs["timeout"], 0)
-            self.assertLessEqual(process.call_args.kwargs["timeout"], 300)
+            self.assertGreater(process.call_args.kwargs["limits"].timeout_seconds, 0)
+            self.assertLessEqual(process.call_args.kwargs["limits"].timeout_seconds, 300)
 
     def test_bubblewrap_startup_failure_is_unavailable_not_a_project_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             result = subprocess.CompletedProcess([], 1, b"", b"bwrap: loopback: Failed to create NETLINK_ROUTE socket: Operation not permitted\n")
-            with patch("anti_slop_core.sandbox.shutil.which", return_value="/usr/bin/bwrap"), patch("anti_slop_core.sandbox.subprocess.run", return_value=result):
+            with patch("anti_slop_core.sandbox.sys.platform", "linux"), patch("anti_slop_core.sandbox.shutil.which", return_value="/usr/bin/bwrap"), patch("anti_slop_core.sandbox.run_bounded", return_value=result):
                 with self.assertRaises(SandboxUnavailable):
                     Sandbox(directory).run(["/bin/true"])
     def test_sandbox_cannot_read_host_file_outside_workspace(self):
@@ -123,8 +238,7 @@ class SandboxBoundaryTests(unittest.TestCase):
             result = sandbox.run(["/bin/true"], timeout=5)
         except SandboxUnavailable as exc:
             self.skipTest(f"real Bubblewrap unavailable: {exc}")
-        if result.returncode != 0:
-            self.skipTest(f"real Bubblewrap probe failed (exit {result.returncode}): {result.stderr.decode(errors='replace').strip()}")
+        self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
         return sandbox
 
 

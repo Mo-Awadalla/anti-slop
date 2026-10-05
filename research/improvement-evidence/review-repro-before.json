@@ -1,0 +1,41 @@
+{
+  "absent_protected": {
+    "exit": 1,
+    "stdout": "",
+    "stderr": "Traceback (most recent call last):\n  File \"/runner/scripts/run.py\", line 8, in <module>\n    raise SystemExit(main())\n                     ^^^^^^\n  File \"/runner/scripts/anti_slop_core/cli.py\", line 129, in main\n    manifest, manifest_path, report_path = runner(spec)\n                                           ^^^^^^^^^^^^\n  File \"/runner/scripts/anti_slop_core/write_modes.py\", line 236, in run_write\n    verification_inputs = _verification_inputs(spec, baseline_tree)\n                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/runner/scripts/anti_slop_core/write_modes.py\", line 152, in _verification_inputs\n    for node in ast.walk(parse(path)):\n                         ^^^^^^^^^^^\n  File \"/runner/scripts/anti_slop_core/write_modes.py\", line 112, in parse\n    parsed[path] = ast.parse(tree[path].data, filename=path)\n                             ~~~~^^^^^^\nKeyError: 'future_helper.py'\n"
+  },
+  "signal_mutant": {
+    "exit": 0,
+    "stdout": "{\"counts\": {\"detected\": 1, \"inconclusive\": 0, \"survived\": 0}, \"output\": \"/tmp/signal-before-report.json\"}\n",
+    "stderr": "",
+    "report": {
+      "counts": {
+        "detected": 1,
+        "inconclusive": 0,
+        "survived": 0
+      },
+      "kind": "oracle-sensitivity",
+      "limitations": [
+        "Each supplied mutant is checked independently against the same clean baseline.",
+        "Detected means stable check failures, not proof of complete oracle coverage.",
+        "Survivors require contextual review; semantic equivalence is not decided.",
+        "Timeouts, resource failures, invalid edits and unavailable execution are inconclusive.",
+        "No mutation-score threshold or automatic repair is enforced."
+      ],
+      "mutations": [
+        {
+          "evidence": "/tmp/review-evidence/cache/anti-slop/runs/run-cc3ec5114a7143d9bca5e4cbb1594f65/write/evidence.json",
+          "id": "signal",
+          "manifest": "/tmp/review-evidence/cache/anti-slop/runs/run-cc3ec5114a7143d9bca5e4cbb1594f65/manifest.json",
+          "outcome": "detected",
+          "paths": [
+            "calc.py"
+          ],
+          "snapshot": "/tmp/signal-before-d72a40cb44274c6395f04aeba5d0fd75",
+          "stop_reason": "step signal rolled back to the previous green checkpoint: step checks did not pass every supplied check without flaky, missing or unavailable results"
+        }
+      ],
+      "schema_version": 1
+    }
+  }
+}

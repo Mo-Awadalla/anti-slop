@@ -1,0 +1,41 @@
+{
+  "absent_protected": {
+    "exit": 0,
+    "stdout": "{\"manifest\": \"/tmp/review-evidence/cache/anti-slop/runs/run-85b5bc60b42f4a918795e982b5045e31/manifest.json\", \"provenance\": \"/tmp/review-evidence/cache/anti-slop/runs/run-85b5bc60b42f4a918795e982b5045e31/provenance.json\", \"report\": \"/tmp/review-evidence/cache/anti-slop/runs/run-85b5bc60b42f4a918795e982b5045e31/report.md\", \"run_id\": \"run-85b5bc60b42f4a918795e982b5045e31\", \"status\": \"passed\"}\n",
+    "stderr": ""
+  },
+  "signal_mutant": {
+    "exit": 0,
+    "stdout": "{\"counts\": {\"detected\": 0, \"inconclusive\": 1, \"survived\": 0}, \"output\": \"/tmp/signal-after-report.json\"}\n",
+    "stderr": "",
+    "report": {
+      "counts": {
+        "detected": 0,
+        "inconclusive": 1,
+        "survived": 0
+      },
+      "kind": "oracle-sensitivity",
+      "limitations": [
+        "Each supplied mutant is checked independently against the same clean baseline.",
+        "Detected means stable check failures, not proof of complete oracle coverage.",
+        "Survivors require contextual review; semantic equivalence is not decided.",
+        "Timeouts, resource failures, invalid edits and unavailable execution are inconclusive.",
+        "No mutation-score threshold or automatic repair is enforced."
+      ],
+      "mutations": [
+        {
+          "evidence": "/tmp/review-evidence/cache/anti-slop/runs/run-48fa73e045a9427fa3c25f3b4cdb892a/write/evidence.json",
+          "id": "signal",
+          "manifest": "/tmp/review-evidence/cache/anti-slop/runs/run-48fa73e045a9427fa3c25f3b4cdb892a/manifest.json",
+          "outcome": "inconclusive",
+          "paths": [
+            "calc.py"
+          ],
+          "snapshot": "/tmp/signal-after-14e4dfb8b3ce48a095865f9e5d6f1644",
+          "stop_reason": "step signal rolled back to the previous green checkpoint: step checks did not pass every supplied check without flaky, missing or unavailable results"
+        }
+      ],
+      "schema_version": 1
+    }
+  }
+}

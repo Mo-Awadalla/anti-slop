@@ -1,0 +1,5 @@
+{
+  "exit": 0,
+  "stdout": "{\"manifest\": \"/evidence/mounted-oracle-before-home/cache/anti-slop/runs/run-4a6c17b1d01547db994e6a5782afbc18/manifest.json\", \"provenance\": \"/evidence/mounted-oracle-before-home/cache/anti-slop/runs/run-4a6c17b1d01547db994e6a5782afbc18/provenance.json\", \"report\": \"/evidence/mounted-oracle-before-home/cache/anti-slop/runs/run-4a6c17b1d01547db994e6a5782afbc18/report.md\", \"run_id\": \"run-4a6c17b1d01547db994e6a5782afbc18\", \"status\": \"passed\"}\n",
+  "stderr": ""
+}

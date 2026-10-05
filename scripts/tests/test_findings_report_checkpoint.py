@@ -101,6 +101,41 @@ class CheckpointTests(unittest.TestCase):
                 head_before,
             )
 
+    def test_failed_rollback_retains_usable_recovery_content_after_context_exit(self):
+        import shutil
+        from unittest.mock import patch
+        from anti_slop_core.checkpoint import Checkpoint, CheckpointRecoveryError
+        with tempfile.TemporaryDirectory() as directory:
+            snapshot = Path(directory) / "snapshot"
+            snapshot.mkdir()
+            state = snapshot / "state.txt"
+            state.write_text("recover this\n")
+            checkpoint = Checkpoint.capture_snapshot(snapshot)
+            self.addCleanup(shutil.rmtree, checkpoint.staging, ignore_errors=True)
+            state.write_text("bad change\n")
+            with patch("anti_slop_core.checkpoint._copy_contents", side_effect=OSError("restore denied")):
+                with self.assertRaises(CheckpointRecoveryError) as caught:
+                    with checkpoint:
+                        checkpoint.rollback()
+            checkpoint.close()
+            self.assertTrue(checkpoint.staging.is_dir())
+            self.assertEqual((checkpoint.staging / "state.txt").read_text(), "recover this\n")
+            self.assertEqual(caught.exception.recovery_path, str(checkpoint.staging))
+            self.assertIn("restore denied", caught.exception.reason)
+
+    def test_successful_verified_rollback_removes_recovery_staging(self):
+        from anti_slop_core.checkpoint import Checkpoint
+        with tempfile.TemporaryDirectory() as directory:
+            snapshot = Path(directory) / "snapshot"
+            snapshot.mkdir()
+            (snapshot / "state.txt").write_text("green\n")
+            with Checkpoint.capture_snapshot(snapshot) as checkpoint:
+                (snapshot / "state.txt").write_text("red\n")
+                checkpoint.rollback()
+                staging = checkpoint.staging
+            self.assertEqual((snapshot / "state.txt").read_text(), "green\n")
+            self.assertFalse(staging.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

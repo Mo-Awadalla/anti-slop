@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import math
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
+
+from .process_limits import DEFAULT_LIMITS, ProcessLimits, run_bounded
 
 
 class SandboxUnavailable(RuntimeError):
@@ -13,14 +17,17 @@ class SandboxUnavailable(RuntimeError):
 
 
 class Sandbox:
-    def __init__(self, workspace: str | Path):
+    def __init__(self, workspace: str | Path, limits: ProcessLimits = DEFAULT_LIMITS):
         self.workspace = Path(workspace).resolve()
+        self.limits = limits
+        if sys.platform != "linux":
+            raise SandboxUnavailable("Bubblewrap execution requires Linux; use the Docker launcher on this host")
         if not self.workspace.is_dir():
             raise ValueError("sandbox workspace must be a directory")
         if shutil.which("bwrap") is None:
             raise SandboxUnavailable("bwrap is unavailable")
 
-    def argv(self, command: list[str], cwd: str = ".") -> list[str]:
+    def argv(self, command: list[str], cwd: str = ".", timeout: float | None = None) -> list[str]:
         if not command or any(not isinstance(x, str) or not x for x in command):
             raise ValueError("argv must be non-empty strings")
         candidate = Path(cwd) if os.path.isabs(cwd) else self.workspace / cwd
@@ -32,7 +39,7 @@ class Sandbox:
             raise ValueError("check cwd must be an existing directory")
         work = "/workspace" if relative == Path(".") else "/workspace/" + relative.as_posix()
         args = [
-            "bwrap", "--die-with-parent", "--new-session", "--unshare-net",
+            "bwrap", "--die-with-parent", "--new-session", "--unshare-user", "--unshare-net",
             "--unshare-pid", "--unshare-ipc", "--unshare-uts", "--cap-drop", "ALL",
             "--clearenv",
         ]
@@ -43,20 +50,30 @@ class Sandbox:
         for system_path in ("/etc/ld.so.cache", "/etc/ssl/certs"):
             if Path(system_path).exists():
                 args.extend(("--ro-bind", system_path, system_path))
+        resource_script = Path(__file__).with_name("resource_exec.py")
+        args.extend(("--ro-bind", str(resource_script), "/anti-slop-resources.py"))
+        timeout = self.limits.timeout_seconds if timeout is None else timeout
+        if not math.isfinite(timeout) or timeout <= 0:
+            raise ValueError("timeout must be finite and positive")
+        resource_command = [
+            "/usr/bin/python3", "-B", "/anti-slop-resources.py",
+            str(self.limits.address_space_bytes), str(self.limits.file_size_bytes),
+            str(self.limits.processes), str(self.limits.open_files),
+            str(max(1, math.ceil(timeout))), *command,
+        ]
         args.extend((
             "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
             "--dir", "/tmp/home", "--bind", str(self.workspace), "/workspace",
             "--chdir", work, "--setenv", "PATH", "/usr/bin:/bin",
             "--setenv", "HOME", "/tmp/home", "--setenv", "LC_ALL", "C.UTF-8",
-            "--setenv", "PYTHONDONTWRITEBYTECODE", "1", "--", *command,
+            "--setenv", "PYTHONDONTWRITEBYTECODE", "1", "--", *resource_command,
         ))
         return args
 
-    def run(self, command: list[str], cwd: str = ".", timeout: float | None = 300) -> subprocess.CompletedProcess:
+    def run(self, command: list[str], cwd: str = ".", timeout: float | None = None) -> subprocess.CompletedProcess:
         try:
-            result = subprocess.run(
-                self.argv(command, cwd), capture_output=True,
-                timeout=300 if timeout is None else timeout,
+            result = run_bounded(
+                self.argv(command, cwd, timeout), limits=self.limits, timeout=timeout,
                 env={"PATH": "/usr/bin:/bin", "HOME": "/tmp/home"},
             )
         except FileNotFoundError as exc:

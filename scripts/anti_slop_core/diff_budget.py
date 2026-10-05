@@ -5,6 +5,7 @@ from __future__ import annotations
 import difflib
 import hashlib
 import os
+import re
 import stat
 from dataclasses import dataclass
 from pathlib import Path
@@ -224,3 +225,124 @@ def unified_patch(before: Mapping[str, FileState], after: Mapping[str, FileState
         for line in difflib.unified_diff(_text(old, path), _text(new, path), fromfile=old_name, tofile=new_name):
             parts.append(line if line.endswith('\n') else line + '\n\\ No newline at end of file\n')
     return ''.join(parts).encode('utf-8')
+
+
+def tree_identities(tree: Mapping[str, FileState]) -> dict:
+    return {path: {'sha256': hashlib.sha256(state.data).hexdigest(),
+                   'size_bytes': len(state.data), 'mode': state.mode}
+            for path, state in sorted(tree.items())}
+
+
+def replay_patch(root: str | Path, patch: bytes) -> dict[str, FileState]:
+    """Replay our strict, text-only patch format in a disposable directory.
+
+    Context bytes, hunk counts/positions, newline markers, paths and modes are
+    checked. Canonical re-export rejects ignored trailers and alternate parses.
+    """
+    root = Path(root)
+    before = read_tree(root)
+    after = dict(before)
+    try:
+        text = patch.decode('utf-8')
+    except UnicodeDecodeError as exc:
+        raise DiffGuardError('patch must be UTF-8 text') from exc
+    lines = text.split('\n')
+    if lines[-1] != '':
+        raise DiffGuardError('patch must end with LF')
+    lines.pop()
+    index = 0
+    visited = set()
+    while index < len(lines):
+        header = lines[index]
+        if not header.startswith('diff --git a/'):
+            raise DiffGuardError('invalid patch file header')
+        old_path, separator, new_path = header[len('diff --git a/'):].partition(' b/')
+        path = safe_relative_path(old_path)
+        if not separator or new_path != path or path in visited:
+            raise DiffGuardError('ambiguous or duplicate patch path')
+        visited.add(path)
+        old = before.get(path)
+        mode = old.mode if old else None
+        operation = 'modify'
+        index += 1
+        if index < len(lines) and lines[index].startswith(('new file mode ', 'deleted file mode ')):
+            declaration = lines[index]
+            operation = 'create' if declaration.startswith('new ') else 'delete'
+            try:
+                declared_mode = int(declaration.rsplit(' ', 1)[-1], 8)
+            except ValueError as exc:
+                raise DiffGuardError('invalid patch mode') from exc
+            if declared_mode & ~0o7777 != 0o100000:
+                raise DiffGuardError('patch mode must describe a regular file')
+            mode = declared_mode & 0o7777
+            if (operation == 'create' and old is not None) or (operation == 'delete' and (old is None or old.mode != mode)):
+                raise DiffGuardError('patch existence or mode precondition failed')
+            index += 1
+        elif old is None:
+            raise DiffGuardError('patch modifies a nonexistent file')
+        source_lines = _text(old, path)
+        output = []
+        cursor = 0
+        if index < len(lines) and lines[index].startswith('--- '):
+            old_name = '/dev/null' if operation == 'create' else 'a/' + path
+            new_name = '/dev/null' if operation == 'delete' else 'b/' + path
+            if lines[index:index + 2] != ['--- ' + old_name, '+++ ' + new_name]:
+                raise DiffGuardError('patch file labels disagree')
+            index += 2
+            while index < len(lines) and lines[index].startswith('@@ '):
+                match = re.fullmatch(r'@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@', lines[index])
+                if match is None:
+                    raise DiffGuardError('invalid patch hunk header')
+                old_start, old_count, new_start, new_count = (int(match[1]), int(match[2] or 1), int(match[3]), int(match[4] or 1))
+                offset = old_start - 1 if old_count else old_start
+                if offset < cursor or offset > len(source_lines):
+                    raise DiffGuardError('patch hunk position is outside baseline')
+                output.extend(source_lines[cursor:offset])
+                cursor = offset
+                if (new_start - 1 if new_count else new_start) != len(output):
+                    raise DiffGuardError('patch new hunk position disagrees')
+                index += 1
+                body = []
+                while index < len(lines) and not lines[index].startswith(('@@ ', 'diff --git ')):
+                    line = lines[index]
+                    if line == '\\ No newline at end of file':
+                        if not body or not body[-1][1].endswith('\n'):
+                            raise DiffGuardError('misplaced missing-newline marker')
+                        body[-1] = (body[-1][0], body[-1][1][:-1])
+                    elif line and line[0] in ' +-':
+                        body.append((line[0], line[1:] + '\n'))
+                    else:
+                        raise DiffGuardError('invalid patch hunk line')
+                    index += 1
+                consumed = produced = 0
+                for tag, value in body:
+                    if tag in ' -':
+                        if cursor >= len(source_lines) or source_lines[cursor] != value:
+                            raise DiffGuardError('patch context/deletion does not match baseline bytes')
+                        cursor += 1
+                        consumed += 1
+                    if tag in ' +':
+                        output.append(value)
+                        produced += 1
+                if (consumed, produced) != (old_count, new_count):
+                    raise DiffGuardError('patch hunk counts disagree')
+        output.extend(source_lines[cursor:])
+        data = ''.join(output).encode('utf-8')
+        if operation == 'delete':
+            if data:
+                raise DiffGuardError('deleted patch file still has content')
+            del after[path]
+        else:
+            after[path] = FileState(data, mode)
+    if unified_patch(before, after) != patch:
+        raise DiffGuardError('patch is not a complete canonical export')
+    # Materialize replay, then re-read to verify actual file bytes and modes.
+    for path in visited:
+        target = root / path
+        if path not in after:
+            target.unlink()
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(after[path].data)
+            target.chmod(after[path].mode)
+    return read_tree(root)

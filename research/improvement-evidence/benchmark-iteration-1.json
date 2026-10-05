@@ -1,0 +1,218 @@
+{
+  "metadata": {
+    "skill_name": "anti-slop",
+    "skill_path": "/Users/mohamedawadalla/Projects/anti-slop/SKILL.md",
+    "executor_model": "task default configuration; resolved model not exposed",
+    "evals_run": [
+      0,
+      1,
+      2
+    ],
+    "runs_per_configuration": 1,
+    "baseline_revision": "72c036bc091de35823318071330488d2919a0d12"
+  },
+  "runs": [
+    {
+      "eval_id": 0,
+      "eval_name": "clean-warning-control",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "pass_rate": 1.0
+      },
+      "expectations": [
+        {
+          "text": "The production serializer stays byte-identical when no contextual defect is demonstrated.",
+          "passed": true,
+          "evidence": "Final serializer bytes compared with original fixture."
+        },
+        {
+          "text": "Declared serialization order and missing-field behavior still pass.",
+          "passed": true,
+          "evidence": "Parent executed original consumer suite; output in consumer-check.txt."
+        },
+        {
+          "text": "The report limits its no-edit claim to the inspected fixture and actual evidence.",
+          "passed": true,
+          "evidence": "Report names scoped evidence rather than a repository-wide verdict."
+        }
+      ]
+    },
+    {
+      "eval_id": 1,
+      "eval_name": "prevent-speculative-registry",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "passed": 2,
+        "failed": 1,
+        "total": 3,
+        "pass_rate": 0.6666666666666666
+      },
+      "expectations": [
+        {
+          "text": "Discount boundary cases and old callers match independent expected values.",
+          "passed": true,
+          "evidence": "Parent independent receipt contract and final consumer suite passed."
+        },
+        {
+          "text": "The implementation avoids speculative registries and dependencies.",
+          "passed": true,
+          "evidence": "Implementation consists of one function and no classes/imported dependencies."
+        },
+        {
+          "text": "The report records actual baseline and final verification.",
+          "passed": false,
+          "evidence": "Report baseline evidence inspected alongside task transcript; final-only pass cannot establish baseline."
+        }
+      ]
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "weak-oracle-repair",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "pass_rate": 1.0
+      },
+      "expectations": [
+        {
+          "text": "Multiplication matches independent expected numeric results.",
+          "passed": true,
+          "evidence": "Parent independent numeric contract and final consumer suite passed."
+        },
+        {
+          "text": "The revised test suite fails when the original +1 mutant is restored in an isolated copy.",
+          "passed": true,
+          "evidence": "Parent restored original +1 mutant in disposable copy; consumer tests failed."
+        },
+        {
+          "text": "The report identifies the weak original oracle and distinguishes baseline from repair evidence.",
+          "passed": true,
+          "evidence": "Report distinguishes original weak oracle, strengthened failing case, and repair."
+        }
+      ]
+    },
+    {
+      "eval_id": 0,
+      "eval_name": "clean-warning-control",
+      "configuration": "old_skill",
+      "run_number": 1,
+      "result": {
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "pass_rate": 1.0
+      },
+      "expectations": [
+        {
+          "text": "The production serializer stays byte-identical when no contextual defect is demonstrated.",
+          "passed": true,
+          "evidence": "Final serializer bytes compared with original fixture."
+        },
+        {
+          "text": "Declared serialization order and missing-field behavior still pass.",
+          "passed": true,
+          "evidence": "Parent executed original consumer suite; output in consumer-check.txt."
+        },
+        {
+          "text": "The report limits its no-edit claim to the inspected fixture and actual evidence.",
+          "passed": true,
+          "evidence": "Report names scoped evidence rather than a repository-wide verdict."
+        }
+      ]
+    },
+    {
+      "eval_id": 1,
+      "eval_name": "prevent-speculative-registry",
+      "configuration": "old_skill",
+      "run_number": 1,
+      "result": {
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "pass_rate": 1.0
+      },
+      "expectations": [
+        {
+          "text": "Discount boundary cases and old callers match independent expected values.",
+          "passed": true,
+          "evidence": "Parent independent receipt contract and final consumer suite passed."
+        },
+        {
+          "text": "The implementation avoids speculative registries and dependencies.",
+          "passed": true,
+          "evidence": "Implementation consists of one function and no classes/imported dependencies."
+        },
+        {
+          "text": "The report records actual baseline and final verification.",
+          "passed": true,
+          "evidence": "Report baseline evidence inspected alongside task transcript; final-only pass cannot establish baseline."
+        }
+      ]
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "weak-oracle-repair",
+      "configuration": "old_skill",
+      "run_number": 1,
+      "result": {
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "pass_rate": 1.0
+      },
+      "expectations": [
+        {
+          "text": "Multiplication matches independent expected numeric results.",
+          "passed": true,
+          "evidence": "Parent independent numeric contract and final consumer suite passed."
+        },
+        {
+          "text": "The revised test suite fails when the original +1 mutant is restored in an isolated copy.",
+          "passed": true,
+          "evidence": "Parent restored original +1 mutant in disposable copy; consumer tests failed."
+        },
+        {
+          "text": "The report identifies the weak original oracle and distinguishes baseline from repair evidence.",
+          "passed": true,
+          "evidence": "Report distinguishes original weak oracle, strengthened failing case, and repair."
+        }
+      ]
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 0.8888888888888888,
+        "stddev": 0.1924500897298753,
+        "min": 0.6666666666666666,
+        "max": 1.0
+      }
+    },
+    "old_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      }
+    },
+    "delta": {
+      "pass_rate": "-0.1111"
+    }
+  },
+  "notes": [
+    "Three synthetic tasks with one trial per configuration. No broad efficacy or statistical significance claim.",
+    "Original and final skill pass all criteria after explicit baseline execution was restored.",
+    "The initial revision missed baseline execution in prevention; that failure remains recorded in iteration-1.",
+    "Token metrics were not exposed. Rounded task durations are retained separately and are not a performance benchmark.",
+    "Artifacts were independently exercised with literal consumer checks and an isolated +1 mutation."
+  ]
+}

@@ -1,0 +1,701 @@
+{
+  "method": "Original versus revised skill; rubric withheld from task agents; one trial per case/configuration; independent consumer and mutation checks. Resolved executor models and token metrics were not exposed.",
+  "trials": [
+    {
+      "iteration": 1,
+      "case": {
+        "id": 0,
+        "name": "clean-warning-control",
+        "prompt": "Diagnose serializer.py for unnecessary complexity. A tool flagged its length and this file has frequent commits. Preserve its field order, required-field errors, and existing conventions. Edit only if you can demonstrate a useful supported improvement.",
+        "expected_output": "No unsupported production edit; report scope, actual checks, and limits."
+      },
+      "configuration": "with_skill",
+      "eval_metadata": {
+        "eval_id": 0,
+        "eval_name": "clean-warning-control",
+        "prompt": "Diagnose serializer.py for unnecessary complexity. A tool flagged its length and this file has frequent commits. Preserve its field order, required-field errors, and existing conventions. Edit only if you can demonstrate a useful supported improvement.",
+        "assertions": [
+          "The production serializer stays byte-identical when no contextual defect is demonstrated.",
+          "Declared serialization order and missing-field behavior still pass.",
+          "The report limits its no-edit claim to the inspected fixture and actual evidence."
+        ]
+      },
+      "grading": {
+        "expectations": [
+          {
+            "text": "The production serializer stays byte-identical when no contextual defect is demonstrated.",
+            "passed": true,
+            "evidence": "Final serializer bytes compared with original fixture."
+          },
+          {
+            "text": "Declared serialization order and missing-field behavior still pass.",
+            "passed": true,
+            "evidence": "Parent executed original consumer suite; output in consumer-check.txt."
+          },
+          {
+            "text": "The report limits its no-edit claim to the inspected fixture and actual evidence.",
+            "passed": true,
+            "evidence": "Report names scoped evidence rather than a repository-wide verdict."
+          }
+        ],
+        "summary": {
+          "passed": 3,
+          "failed": 0,
+          "total": 3,
+          "pass_rate": 1.0
+        }
+      },
+      "timing": {
+        "total_duration_seconds": 77,
+        "duration_source": "task completion rounded duration; token metrics unavailable"
+      },
+      "consumer_evidence": {
+        "consumer-check.txt": "test_order (test_module.Contract.test_order) ... ok\ntest_required (test_module.Contract.test_required) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n"
+      },
+      "outputs": {
+        "serializer.py": "def render_user(user):\n    return \"|\".join(str(user[key]) for key in (\"id\", \"name\", \"role\", \"active\", \"team\", \"region\"))\n",
+        "test_module.py": "import unittest\nfrom serializer import render_user\nclass Contract(unittest.TestCase):\n    def test_order(self):\n        self.assertEqual(render_user(dict(id=3,name=\"Ada\",role=\"admin\",active=True,team=\"infra\",region=\"east\")), \"3|Ada|admin|True|infra|east\")\n    def test_required(self):\n        with self.assertRaises(KeyError): render_user({})\n",
+        "report.md": "# Serializer diagnosis\n\n## Outcome\n\n**No useful supported improvement found in the reviewed scope; no code or test changes made.** The reviewed scope is `serializer.py` and its only supplied caller, `test_module.py`. The final exercised fixture is identical to the initial fixture.\n\n`render_user` is a two-line function with one explicit, ordered field tuple and one generator passed to `str.join`. The tuple visibly defines the wire order; direct `user[key]` lookup implements required fields without an additional validation layer. There is no duplicated field policy, unnecessary dependency boundary, or demonstrated difficult change path in the supplied files. Extracting helpers or adding a schema abstraction would move this policy rather than eliminate an evidenced cost. Splitting the expression for line length alone would be a style preference; no formatter configuration or conflicting convention was supplied.\n\n## Signals and judgment\n\n- **Reported signals:** a tool flagged length, and the file has frequent commits. These are accepted as review leads, not evidence of a defect. The raw warning and commit history were not supplied in the editable scope, so neither their causes nor their contents were independently examined.\n- **Context:** `serializer.py:1\u20132` already expresses the whole transformation in one place. `test_module.py:4\u20137` independently expects the declared output and a missing-field exception.\n- **Potential cost:** frequent edits could indicate changing field policy, but no repeated edits across modules, policy drift, or coupling are demonstrated here. This is an unconfirmed hypothesis, not an actionable finding.\n- **Confidence:** high that the supplied implementation is locally simple; limited regarding callers and maintenance history outside this fixture.\n- **Counterargument/falsifier:** actual duplicated field definitions, incompatible caller expectations, or commit evidence of repeated cross-file updates could justify another diagnosis. None is present in the reviewed scope.\n- **Action:** retain the implementation and its conventions. If future history shows a concrete maintenance problem, review that change path rather than optimizing a length or churn metric.\n\n## Exercised behavior\n\nThe existing tests cover a representative output and rejection of empty input. A separate direct probe additionally covers input insertion order differing from output order, ignored extra fields, each of the six required fields missing individually, exact `KeyError.args`, and the first error for empty input. Expected output and errors are specified independently in the checks, not calculated by calling the serializer to build an expectation.\n\nAll commands ran in:\n\n`/tmp/anti-slop-skill-eval/iteration-1/eval-0-clean-warning-control/with_skill/outputs`\n\n### Existing fixture tests\n\nExact command:\n\n```sh\npython3 -B -m unittest -v test_module\n```\n\nActual output:\n\n```text\ntest_order (test_module.Contract.test_order) ... ok\ntest_required (test_module.Contract.test_required) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n```\n\n### Direct boundary probe\n\nExact command (executed via Python `subprocess.run` with the shown arguments):\n\n```sh\npython3 -B -c 'from serializer import render_user\nfields = (\"id\", \"name\", \"role\", \"active\", \"team\", \"region\")\nuser = dict(region=\"east\", team=\"infra\", active=True, role=\"admin\", name=\"Ada\", id=3, ignored=\"extra\")\nassert render_user(user) == \"3|Ada|admin|True|infra|east\"\nfor missing in fields:\n    partial = user.copy()\n    del partial[missing]\n    try:\n        render_user(partial)\n    except KeyError as exc:\n        assert exc.args == (missing,), exc.args\n    else:\n        raise AssertionError(\"required field accepted: \" + missing)\ntry:\n    render_user({})\nexcept KeyError as exc:\n    assert exc.args == (\"id\",), exc.args\nelse:\n    raise AssertionError(\"empty input accepted\")\nprint(\"PASS: declared output order, extra-field handling, six required-field errors, first missing field\")\n'\n```\n\nExit code: `0`. Actual stdout:\n\n```text\nPASS: declared output order, extra-field handling, six required-field errors, first missing field\n```\n\nStderr was empty. `-B` prevented bytecode artifacts; the probe created no files.\n\n## Limits\n\nThese checks support only the exercised mapping and required-field behavior. They do not establish correctness for every custom mapping or value type, prove a performance claim, or explain historical churn. No external callers, repository-wide suites, linter, formatter, or optional sandbox runner were examined or run. No intentional behavior changes, introduced failures, or recovery step apply because no implementation change was warranted. This is a scoped no-edit diagnosis, not a universal clean-code verdict.\n"
+      }
+    },
+    {
+      "iteration": 1,
+      "case": {
+        "id": 0,
+        "name": "clean-warning-control",
+        "prompt": "Diagnose serializer.py for unnecessary complexity. A tool flagged its length and this file has frequent commits. Preserve its field order, required-field errors, and existing conventions. Edit only if you can demonstrate a useful supported improvement.",
+        "expected_output": "No unsupported production edit; report scope, actual checks, and limits."
+      },
+      "configuration": "old_skill",
+      "eval_metadata": {
+        "eval_id": 0,
+        "eval_name": "clean-warning-control",
+        "prompt": "Diagnose serializer.py for unnecessary complexity. A tool flagged its length and this file has frequent commits. Preserve its field order, required-field errors, and existing conventions. Edit only if you can demonstrate a useful supported improvement.",
+        "assertions": [
+          "The production serializer stays byte-identical when no contextual defect is demonstrated.",
+          "Declared serialization order and missing-field behavior still pass.",
+          "The report limits its no-edit claim to the inspected fixture and actual evidence."
+        ]
+      },
+      "grading": {
+        "expectations": [
+          {
+            "text": "The production serializer stays byte-identical when no contextual defect is demonstrated.",
+            "passed": true,
+            "evidence": "Final serializer bytes compared with original fixture."
+          },
+          {
+            "text": "Declared serialization order and missing-field behavior still pass.",
+            "passed": true,
+            "evidence": "Parent executed original consumer suite; output in consumer-check.txt."
+          },
+          {
+            "text": "The report limits its no-edit claim to the inspected fixture and actual evidence.",
+            "passed": true,
+            "evidence": "Report names scoped evidence rather than a repository-wide verdict."
+          }
+        ],
+        "summary": {
+          "passed": 3,
+          "failed": 0,
+          "total": 3,
+          "pass_rate": 1.0
+        }
+      },
+      "timing": {
+        "total_duration_seconds": 85,
+        "duration_source": "task completion rounded duration; token metrics unavailable"
+      },
+      "consumer_evidence": {
+        "consumer-check.txt": "test_order (test_module.Contract.test_order) ... ok\ntest_required (test_module.Contract.test_required) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n"
+      },
+      "outputs": {
+        "serializer.py": "def render_user(user):\n    return \"|\".join(str(user[key]) for key in (\"id\", \"name\", \"role\", \"active\", \"team\", \"region\"))\n",
+        "test_module.py": "import unittest\nfrom serializer import render_user\nclass Contract(unittest.TestCase):\n    def test_order(self):\n        self.assertEqual(render_user(dict(id=3,name=\"Ada\",role=\"admin\",active=True,team=\"infra\",region=\"east\")), \"3|Ada|admin|True|infra|east\")\n    def test_required(self):\n        with self.assertRaises(KeyError): render_user({})\n",
+        "report.md": "# Serializer diagnosis\n\n## Decision\n\n**No supported improvement found in the reviewed scope. Leave `serializer.py` and its tests unchanged.**\n\nThe reported length warning and frequent commits are investigation leads, not demonstrated complexity defects. The supplied `serializer.py` is two lines: one function with a single expression. Its implementation already keeps the complete serialization policy in one place (`serializer.py:1\u20132`):\n\n- The explicit tuple preserves `id`, `name`, `role`, `active`, `team`, `region` order independently of the input mapping's insertion order.\n- Direct `user[key]` access preserves required-field `KeyError` behavior, including the missing key and first missing field in serialization order.\n- `str(...)` and `\"|\".join(...)` perform the conversion and formatting directly, without helper layers, branching, duplicated policy, or extra dependencies.\n\nThe only supplied caller is the contract test (`test_module.py:2\u20137`). Its expected serialization is a literal, not an expectation calculated through the implementation. The required-field test checks `KeyError` but not its payload; the additional read-only probe below exercises that boundary without changing the test suite.\n\n**Evidence chain:** reported size/churn signals \u2192 a localized, explicit implementation and direct contract tests \u2192 no demonstrated change amplification or comprehension cost that a refactor would remove \u2192 high confidence in the no-edit decision for this fixture \u2192 a real recurring change requiring duplicated edits or an unclear behavior boundary would falsify that decision \u2192 retain the implementation and revisit only with that concrete evidence.\n\nExtracting the fields into a separate helper or configurable serializer would add indirection without an observed reuse need. Replacing direct access with defaults would violate the required-field contract. Formatting changes alone have no demonstrated benefit here and would introduce unnecessary churn. Existing compact conventions remain untouched.\n\n## Actual checks\n\nBoth checks ran in:\n\n`/tmp/anti-slop-skill-eval/iteration-1/eval-0-clean-warning-control/old_skill/outputs`\n\n### Supplied contract tests\n\nExact command:\n\n```sh\npython3 -B -m unittest -v test_module\n```\n\nActual output:\n\n```text\ntest_order (test_module.Contract.test_order) ... ok\ntest_required (test_module.Contract.test_required) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n```\n\nThe command completed successfully. These tests exercise the unchanged final fixture's normal output and empty-input required-field error.\n\n### Additional behavior-boundary probe\n\nExact command (executed via a subprocess, without creating a script file):\n\n```sh\npython3 -B -c 'from serializer import render_user\nfields = (\"id\", \"name\", \"role\", \"active\", \"team\", \"region\")\nvalues = dict(id=3, name=\"Ada\", role=\"admin\", active=True, team=\"infra\", region=\"east\")\nreordered = dict(reversed(tuple(values.items())))\nassert render_user(reordered) == \"3|Ada|admin|True|infra|east\"\nfor field in fields:\n    candidate = values.copy()\n    del candidate[field]\n    try:\n        render_user(candidate)\n    except KeyError as error:\n        assert error.args == (field,), (field, error.args)\n    else:\n        raise AssertionError(\"Missing required field accepted: \" + field)\ntry:\n    render_user({})\nexcept KeyError as error:\n    assert error.args == (\"id\",), error.args\nelse:\n    raise AssertionError(\"Empty input accepted\")\nprint(\"PASS: fixed order despite reversed input; all 6 missing fields raise exact KeyError; empty input reports id first\")\n'\n```\n\nExit code: **0**. Standard error: empty. Standard output:\n\n```text\nPASS: fixed order despite reversed input; all 6 missing fields raise exact KeyError; empty input reports id first\n```\n\n## Scope and limitations\n\nReviewed all supplied source and test files and searched their serializer references. The supplied directory contains no project instructions, configuration, or revision/history metadata; the original warning output and commit history were not supplied within the authorized scope. The reported warning and churn are accepted as signals, but their underlying causes cannot be attributed from this fixture alone.\n\nThere is no reported functional defect to reproduce, so bug-specific minimization, instrumentation, and repair were unnecessary. No source or test edits, behavior changes, scaffolds, commits, or pushes were made. Only this requested report was added. Passing checks support the exercised ordering and required-field boundaries, not universal correctness or a general benchmark conclusion. No broader repository suites, lint, formatting, runner sandbox checks, or performance measurements were run.\n"
+      }
+    },
+    {
+      "iteration": 1,
+      "case": {
+        "id": 1,
+        "name": "prevent-speculative-registry",
+        "prompt": "Implement an optional discount in receipt.total with default 0 and allowed range 0 through 1 inclusive. Preserve existing callers and empty-receipt behavior. The generated draft proposes a strategy registry and factory for future discount types; decide whether that machinery earns its cost. Use this directory only.",
+        "expected_output": "Correct discount behavior with bounds and old callers preserved, no speculative registry."
+      },
+      "configuration": "with_skill",
+      "eval_metadata": {
+        "eval_id": 1,
+        "eval_name": "prevent-speculative-registry",
+        "prompt": "Implement an optional discount in receipt.total with default 0 and allowed range 0 through 1 inclusive. Preserve existing callers and empty-receipt behavior. The generated draft proposes a strategy registry and factory for future discount types; decide whether that machinery earns its cost. Use this directory only.",
+        "assertions": [
+          "Discount boundary cases and old callers match independent expected values.",
+          "The implementation avoids speculative registries and dependencies.",
+          "The report records actual baseline and final verification."
+        ]
+      },
+      "grading": {
+        "expectations": [
+          {
+            "text": "Discount boundary cases and old callers match independent expected values.",
+            "passed": true,
+            "evidence": "Parent independent receipt contract and final consumer suite passed."
+          },
+          {
+            "text": "The implementation avoids speculative registries and dependencies.",
+            "passed": true,
+            "evidence": "Implementation consists of one function and no classes/imported dependencies."
+          },
+          {
+            "text": "The report records actual baseline and final verification.",
+            "passed": false,
+            "evidence": "Report baseline evidence inspected alongside task transcript; final-only pass cannot establish baseline."
+          }
+        ],
+        "summary": {
+          "passed": 2,
+          "failed": 1,
+          "total": 3,
+          "pass_rate": 0.6666666666666666
+        }
+      },
+      "timing": {
+        "total_duration_seconds": 462,
+        "duration_source": "task completion rounded duration; token metrics unavailable"
+      },
+      "consumer_evidence": {
+        "consumer-check.txt": "test_discount_boundaries (test_module.Contract.test_discount_boundaries) ... ok\ntest_empty (test_module.Contract.test_empty) ... ok\ntest_empty_with_discount (test_module.Contract.test_empty_with_discount) ... ok\ntest_fractional_discount (test_module.Contract.test_fractional_discount) ... ok\ntest_invalid_discount (test_module.Contract.test_invalid_discount) ... ok\ntest_invalid_discount_with_empty_receipt (test_module.Contract.test_invalid_discount_with_empty_receipt) ... ok\ntest_iterable_prices (test_module.Contract.test_iterable_prices) ... ok\ntest_positional_discount (test_module.Contract.test_positional_discount) ... ok\ntest_total (test_module.Contract.test_total) ... ok\n\n----------------------------------------------------------------------\nRan 9 tests in 0.000s\n\nOK\n",
+        "hidden-contract.txt": "independent receipt contract passed\n"
+      },
+      "outputs": {
+        "receipt.py": "def total(prices, discount=0):\n    \"\"\"Return the sum of prices reduced by a discount from 0 through 1.\"\"\"\n    if not 0 <= discount <= 1:\n        raise ValueError(\"discount must be between 0 and 1 inclusive\")\n    return sum(prices) * (1 - discount)\n",
+        "test_module.py": "import unittest\nfrom receipt import total\nclass Contract(unittest.TestCase):\n    def test_total(self): self.assertEqual(total([10, 20]), 30)\n    def test_empty(self): self.assertEqual(total([]), 0)\n\n    def test_fractional_discount(self):\n        self.assertEqual(total([10, 20], discount=0.25), 22.5)\n\n    def test_discount_boundaries(self):\n        self.assertEqual(total([10, 20], discount=0), 30)\n        self.assertEqual(total([10, 20], discount=1), 0)\n\n    def test_positional_discount(self):\n        self.assertEqual(total([10, 20], 0.5), 15)\n\n    def test_empty_with_discount(self):\n        for discount in (0, 0.25, 1):\n            with self.subTest(discount=discount):\n                self.assertEqual(total([], discount=discount), 0)\n\n    def test_invalid_discount(self):\n        for discount in (-0.01, 1.01, float(\"nan\"), float(\"-inf\"), float(\"inf\")):\n            with self.subTest(discount=discount):\n                with self.assertRaises(ValueError):\n                    total([10, 20], discount=discount)\n\n    def test_invalid_discount_with_empty_receipt(self):\n        with self.assertRaises(ValueError):\n            total([], discount=-0.01)\n\n    def test_iterable_prices(self):\n        self.assertEqual(total(iter([10, 20]), discount=0.25), 22.5)\n",
+        "report.md": "# Optional receipt discount\n\nImplemented `total(prices, discount=0)` in `receipt.py`. The result is `sum(prices) * (1 - discount)`. Discounts must be between 0 and 1 inclusive; values outside that range, including NaN and infinities, raise `ValueError`. The original single-argument calls remain valid, and empty receipts return zero for every valid discount. Positional and keyword discount calls are supported.\n\n## Design decision\n\nDid not introduce the proposed strategy registry or factory. The inspected fixture has one function, two existing tests, and one requested discount rule. There is no demonstrated second strategy, plugin boundary, or configurable dispatch requirement. Adding registration, selection, and strategy objects would spread this arithmetic rule and its validation across more concepts without serving an existing caller. Confidence in the local decision is high; actual independently owned discount implementations or a real plugin requirement would warrant reconsideration. This is a scope-specific judgment, not a blanket rejection of strategy patterns.\n\n## Changes\n\n- `receipt.py`: optional discount, inclusive-range validation, direct calculation, and API docstring.\n- `test_module.py`: retained both original tests unchanged; added tests for fractional discounts, both endpoints, positional calls, empty receipts with discounts, invalid discounts, invalid discounts on empty receipts, and iterable input. Expected totals are literal values rather than results calculated through the implementation.\n\nNo registry, factory, new dependency, or unrelated code changes were introduced. All writes are within this assigned output directory.\n\n## Actual verification\n\nExecuted from this directory after the implementation was complete:\n\n```sh\npython3 -B -m unittest -v test_module\n```\n\nExit code: **0**. Actual output:\n\n```text\ntest_discount_boundaries (test_module.Contract.test_discount_boundaries) ... ok\ntest_empty (test_module.Contract.test_empty) ... ok\ntest_empty_with_discount (test_module.Contract.test_empty_with_discount) ... ok\ntest_fractional_discount (test_module.Contract.test_fractional_discount) ... ok\ntest_invalid_discount (test_module.Contract.test_invalid_discount) ... ok\ntest_invalid_discount_with_empty_receipt (test_module.Contract.test_invalid_discount_with_empty_receipt) ... ok\ntest_iterable_prices (test_module.Contract.test_iterable_prices) ... ok\ntest_positional_discount (test_module.Contract.test_positional_discount) ... ok\ntest_total (test_module.Contract.test_total) ... ok\n\n----------------------------------------------------------------------\nRan 9 tests in 0.000s\n\nOK\n```\n\n## Evidence limits and recovery\n\nThe inspected baseline implementation was exactly `def total(prices): return sum(prices)` on two lines, and its existing tests asserted a total of 30 for `[10, 20]` and zero for `[]`. No baseline test command was run; there is no measured baseline failure or claimed baseline pass. Both original assertions passed in the final run. The fixture contains no additional callers, CI configuration, or integration checks, so the evidence establishes this local numeric API contract, not universal compatibility for arbitrary Python objects or monetary rounding policies. No rounding policy or additional input-type restrictions were added.\n\nRecovery: restore the original two-line function and remove the seven added test methods; the original two tests were not changed. This report records the intentional new discount behavior and the original implementation without introducing a backup module.\n"
+      }
+    },
+    {
+      "iteration": 1,
+      "case": {
+        "id": 1,
+        "name": "prevent-speculative-registry",
+        "prompt": "Implement an optional discount in receipt.total with default 0 and allowed range 0 through 1 inclusive. Preserve existing callers and empty-receipt behavior. The generated draft proposes a strategy registry and factory for future discount types; decide whether that machinery earns its cost. Use this directory only.",
+        "expected_output": "Correct discount behavior with bounds and old callers preserved, no speculative registry."
+      },
+      "configuration": "old_skill",
+      "eval_metadata": {
+        "eval_id": 1,
+        "eval_name": "prevent-speculative-registry",
+        "prompt": "Implement an optional discount in receipt.total with default 0 and allowed range 0 through 1 inclusive. Preserve existing callers and empty-receipt behavior. The generated draft proposes a strategy registry and factory for future discount types; decide whether that machinery earns its cost. Use this directory only.",
+        "assertions": [
+          "Discount boundary cases and old callers match independent expected values.",
+          "The implementation avoids speculative registries and dependencies.",
+          "The report records actual baseline and final verification."
+        ]
+      },
+      "grading": {
+        "expectations": [
+          {
+            "text": "Discount boundary cases and old callers match independent expected values.",
+            "passed": true,
+            "evidence": "Parent independent receipt contract and final consumer suite passed."
+          },
+          {
+            "text": "The implementation avoids speculative registries and dependencies.",
+            "passed": true,
+            "evidence": "Implementation consists of one function and no classes/imported dependencies."
+          },
+          {
+            "text": "The report records actual baseline and final verification.",
+            "passed": true,
+            "evidence": "Report baseline evidence inspected alongside task transcript; final-only pass cannot establish baseline."
+          }
+        ],
+        "summary": {
+          "passed": 3,
+          "failed": 0,
+          "total": 3,
+          "pass_rate": 1.0
+        }
+      },
+      "timing": {
+        "total_duration_seconds": 80,
+        "duration_source": "task completion rounded duration; token metrics unavailable"
+      },
+      "consumer_evidence": {
+        "consumer-check.txt": "test_empty (test_module.Contract.test_empty) ... ok\ntest_empty_with_discount (test_module.Contract.test_empty_with_discount) ... ok\ntest_existing_generator_caller (test_module.Contract.test_existing_generator_caller) ... ok\ntest_fractional_discount (test_module.Contract.test_fractional_discount) ... ok\ntest_full_discount (test_module.Contract.test_full_discount) ... ok\ntest_invalid_discount (test_module.Contract.test_invalid_discount) ... ok\ntest_invalid_discount_on_empty_receipt (test_module.Contract.test_invalid_discount_on_empty_receipt) ... ok\ntest_positional_discount (test_module.Contract.test_positional_discount) ... ok\ntest_total (test_module.Contract.test_total) ... ok\ntest_zero_discount (test_module.Contract.test_zero_discount) ... ok\n\n----------------------------------------------------------------------\nRan 10 tests in 0.000s\n\nOK\n",
+        "hidden-contract.txt": "independent receipt contract passed\n"
+      },
+      "outputs": {
+        "receipt.py": "def total(prices, discount=0):\n    \"\"\"Return the sum of prices reduced by a discount from 0 through 1.\"\"\"\n    if not 0 <= discount <= 1:\n        raise ValueError(\"discount must be between 0 and 1 inclusive\")\n    return sum(prices) * (1 - discount)\n",
+        "test_module.py": "import unittest\nfrom receipt import total\nclass Contract(unittest.TestCase):\n    def test_total(self): self.assertEqual(total([10, 20]), 30)\n    def test_empty(self): self.assertEqual(total([]), 0)\n\n    def test_zero_discount(self):\n        self.assertEqual(total([10, 20], discount=0), 30)\n\n    def test_full_discount(self):\n        self.assertEqual(total([10, 20], discount=1), 0)\n\n    def test_fractional_discount(self):\n        self.assertEqual(total([10, 20], discount=0.25), 22.5)\n\n    def test_positional_discount(self):\n        self.assertEqual(total([10, 20], 0.5), 15)\n\n    def test_empty_with_discount(self):\n        for discount in (0, 0.25, 1):\n            with self.subTest(discount=discount):\n                self.assertEqual(total([], discount=discount), 0)\n\n    def test_invalid_discount(self):\n        for discount in (-0.01, 1.01, float(\"nan\"), float(\"-inf\"), float(\"inf\")):\n            with self.subTest(discount=discount):\n                with self.assertRaises(ValueError):\n                    total([10, 20], discount=discount)\n\n    def test_invalid_discount_on_empty_receipt(self):\n        with self.assertRaises(ValueError):\n            total([], discount=-0.01)\n\n    def test_existing_generator_caller(self):\n        self.assertEqual(total(price for price in (10, 20)), 30)\n",
+        "report.md": "# Optional receipt discount\n\nImplemented `total(prices, discount=0)` in `receipt.py`. The result is `sum(prices) * (1 - discount)`. Discounts must be within the inclusive range 0 through 1; values outside it raise `ValueError`. The range check also rejects NaN and infinities. Existing one-argument callers retain their totals, and empty receipts still total zero for every valid discount.\n\n## Design decision\n\nThe proposed strategy registry and factory do not earn their cost here. The inspected fixture has one public function and two existing callers/tests, and the request introduces only one percentage-discount calculation. There is no demonstrated second discount strategy or external integration boundary. A registry and factory would introduce dispatch, registration, and extra public concepts without serving the requested behavior. Such machinery could become justified by concrete multiple-strategy requirements; it is not included speculatively.\n\nThe change stays within `receipt.py` and `test_module.py`, plus this requested report. No dependencies or new production modules were added. The original tests were retained unchanged; new assertions use explicit expected totals rather than deriving expectations from the implementation.\n\n## Executed evidence\n\nWorking directory for both commands:\n\n`/tmp/anti-slop-skill-eval/iteration-1/eval-1-prevent-speculative-registry/old_skill/outputs`\n\nBaseline, before editing:\n\n```text\n$ python3 -m unittest -v test_module\ntest_empty (test_module.Contract.test_empty) ... ok\ntest_total (test_module.Contract.test_total) ... ok\n\nRan 2 tests in 0.000s\nOK\n```\n\nFinal changed fixture:\n\n```text\n$ python3 -m unittest -v test_module\ntest_empty (test_module.Contract.test_empty) ... ok\ntest_empty_with_discount (test_module.Contract.test_empty_with_discount) ... ok\ntest_existing_generator_caller (test_module.Contract.test_existing_generator_caller) ... ok\ntest_fractional_discount (test_module.Contract.test_fractional_discount) ... ok\ntest_full_discount (test_module.Contract.test_full_discount) ... ok\ntest_invalid_discount (test_module.Contract.test_invalid_discount) ... ok\ntest_invalid_discount_on_empty_receipt (test_module.Contract.test_invalid_discount_on_empty_receipt) ... ok\ntest_positional_discount (test_module.Contract.test_positional_discount) ... ok\ntest_total (test_module.Contract.test_total) ... ok\ntest_zero_discount (test_module.Contract.test_zero_discount) ... ok\n\nRan 10 tests in 0.000s\nOK\n```\n\nThese checks exercise default and explicit zero discounts, a fractional discount, full discount, positional and keyword calls, empty receipts, generator callers, out-of-range values, NaN, and infinities. There were no observed baseline or final test failures. No build, lint, formatter, or broader repository suite was run. These fixture results support the listed behavior, not a general efficacy claim for anti-slop.\n\n## Recovery and limitations\n\nThe original production implementation was exactly:\n\n```python\ndef total(prices):\n    return sum(prices)\n```\n\nThe two original tests remain the first tests in `test_module.py`; recovery would restore the production snippet and remove only the newly added methods. This work changes only the assigned isolated fixture, not the source anti-slop repository or baseline skill. Currency rounding and a new policy for nonnumeric discounts were not requested and were not introduced; incompatible operand types continue to raise Python errors.\n"
+      }
+    },
+    {
+      "iteration": 1,
+      "case": {
+        "id": 2,
+        "name": "weak-oracle-repair",
+        "prompt": "Review and repair calc.multiply if its multiplication contract is wrong. Check the existing verification quality before relying on it. This request authorizes a correction and independent regression tests in this directory. Preserve unaffected multiplication behavior.",
+        "expected_output": "Repair product behavior; replace tautological oracle with independent assertions and demonstrate sensitivity."
+      },
+      "configuration": "with_skill",
+      "eval_metadata": {
+        "eval_id": 2,
+        "eval_name": "weak-oracle-repair",
+        "prompt": "Review and repair calc.multiply if its multiplication contract is wrong. Check the existing verification quality before relying on it. This request authorizes a correction and independent regression tests in this directory. Preserve unaffected multiplication behavior.",
+        "assertions": [
+          "Multiplication matches independent expected numeric results.",
+          "The revised test suite fails when the original +1 mutant is restored in an isolated copy.",
+          "The report identifies the weak original oracle and distinguishes baseline from repair evidence."
+        ]
+      },
+      "grading": {
+        "expectations": [
+          {
+            "text": "Multiplication matches independent expected numeric results.",
+            "passed": true,
+            "evidence": "Parent independent numeric contract and final consumer suite passed."
+          },
+          {
+            "text": "The revised test suite fails when the original +1 mutant is restored in an isolated copy.",
+            "passed": true,
+            "evidence": "Parent restored original +1 mutant in disposable copy; consumer tests failed."
+          },
+          {
+            "text": "The report identifies the weak original oracle and distinguishes baseline from repair evidence.",
+            "passed": true,
+            "evidence": "Report distinguishes original weak oracle, strengthened failing case, and repair."
+          }
+        ],
+        "summary": {
+          "passed": 3,
+          "failed": 0,
+          "total": 3,
+          "pass_rate": 1.0
+        }
+      },
+      "timing": {
+        "total_duration_seconds": 71,
+        "duration_source": "task completion rounded duration; token metrics unavailable"
+      },
+      "consumer_evidence": {
+        "consumer-check.txt": "test_infinite_product (test_module.Contract.test_infinite_product) ... ok\ntest_nan_product (test_module.Contract.test_nan_product) ... ok\ntest_product (test_module.Contract.test_product) ... ok\ntest_unsupported_operands (test_module.Contract.test_unsupported_operands) ... ok\n\n----------------------------------------------------------------------\nRan 4 tests in 0.000s\n\nOK\n",
+        "hidden-contract.txt": "independent product contract passed\n",
+        "independent-mutation-check.txt": "test_infinite_product (test_module.Contract.test_infinite_product) ... ok\ntest_nan_product (test_module.Contract.test_nan_product) ... ok\ntest_product (test_module.Contract.test_product) ... \n  test_product (test_module.Contract.test_product) (a=2, b=3) ... FAIL\n  test_product (test_module.Contract.test_product) (a=3, b=2) ... FAIL\n  test_product (test_module.Contract.test_product) (a=0, b=7) ... FAIL\n  test_product (test_module.Contract.test_product) (a=7, b=0) ... FAIL\n  test_product (test_module.Contract.test_product) (a=1, b=7) ... FAIL\n  test_product (test_module.Contract.test_product) (a=-2, b=3) ... FAIL\n  test_product (test_module.Contract.test_product) (a=-2, b=-3) ... FAIL\n  test_product (test_module.Contract.test_product) (a=1.5, b=2.0) ... FAIL\n  test_product (test_module.Contract.test_product) (a=1000000000000000000000000000000, b=1000000000000000000000000000000) ... FAIL\ntest_unsupported_operands (test_module.Contract.test_unsupported_operands) ... ok\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=2, b=3)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpq8_3knqt/mutant/test_module.py\", line 22, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 7 != 6\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=3, b=2)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpq8_3knqt/mutant/test_module.py\", line 22, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 7 != 6\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=0, b=7)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpq8_3knqt/mutant/test_module.py\", line 22, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 1 != 0\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=7, b=0)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpq8_3knqt/mutant/test_module.py\", line 22, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 1 != 0\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=1, b=7)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpq8_3knqt/mutant/test_module.py\", line 22, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 8 != 7\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=-2, b=3)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpq8_3knqt/mutant/test_module.py\", line 22, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: -5 != -6\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=-2, b=-3)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpq8_3knqt/mutant/test_module.py\", line 22, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 7 != 6\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=1.5, b=2.0)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpq8_3knqt/mutant/test_module.py\", line 22, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 4.0 != 3.0\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=1000000000000000000000000000000, b=1000000000000000000000000000000)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpq8_3knqt/mutant/test_module.py\", line 22, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 1000000000000000000000000000000000000000000000000000000000001 != 1000000000000000000000000000000000000000000000000000000000000\n\n----------------------------------------------------------------------\nRan 4 tests in 0.001s\n\nFAILED (failures=9)\n"
+      },
+      "outputs": {
+        "calc.py": "def multiply(a, b):\n    return a * b\n",
+        "test_module.py": "import math\nimport unittest\n\nfrom calc import multiply\n\n\nclass Contract(unittest.TestCase):\n    def test_product(self):\n        cases = (\n            (2, 3, 6),\n            (3, 2, 6),\n            (0, 7, 0),\n            (7, 0, 0),\n            (1, 7, 7),\n            (-2, 3, -6),\n            (-2, -3, 6),\n            (1.5, 2.0, 3.0),\n            (10**30, 10**30, 10**60),\n        )\n        for a, b, expected in cases:\n            with self.subTest(a=a, b=b):\n                self.assertEqual(multiply(a, b), expected)\n\n    def test_infinite_product(self):\n        self.assertEqual(multiply(float(\"inf\"), 2), float(\"inf\"))\n        self.assertEqual(multiply(float(\"-inf\"), 2), float(\"-inf\"))\n\n    def test_nan_product(self):\n        self.assertTrue(math.isnan(multiply(float(\"nan\"), 2)))\n\n    def test_unsupported_operands(self):\n        with self.assertRaises(TypeError):\n            multiply(None, 3)\n",
+        "report.md": "# Multiplication contract repair\n\n## Outcome\n\nCorrected `calc.multiply` to return `a * b`, rather than `a * b + 1`. The public function name, argument signature, and Python multiplication operation remain unchanged; no coercion, validation, dependencies, or unrelated changes were introduced.\n\nThe intentional behavior change is removal of the erroneous increment. For example, `multiply(2, 3)` now returns `6`, and multiplication by zero returns zero. The existing test compared `multiply(2, 3)` with itself, so it passed even when the result was wrong. A passing original suite was therefore not evidence of the multiplication contract.\n\n## Scope and oracle\n\nReviewed the two supplied files, `calc.py` and `test_module.py`, and the requested anti-slop skill with its authorized-edit and evidence references. No additional callers or project configuration were present in the assigned directory. Only these implementation/test files and this report were changed.\n\nReplaced the self-referential assertion with independently specified expected values for positive integers, reversed operands, zero on either side, identity, mixed signs, two negative operands, floating-point multiplication, and large integers. Separate preservation checks cover positive/negative infinity, NaN, and the existing `TypeError` for an unsupported operand (`None`). These checks exercise the real function without mocks.\n\nThe new oracle was run against the original implementation before correction. All nine finite-product cases failed, including `AssertionError: 7 != 6` and `AssertionError: 1 != 0`; the three unaffected-behavior test methods passed. This demonstrates sensitivity to the actual defect rather than merely asserting the repaired output after the fact.\n\n## Actual checks\n\nAll three invocations used the exact command:\n\n```sh\npython3 -B -m unittest discover -v\n```\n\nWorking directory for every invocation:\n\n```text\n/tmp/anti-slop-skill-eval/iteration-1/eval-2-weak-oracle-repair/with_skill/outputs\n```\n\n1. **Original implementation and original test:** exit 0; `Ran 1 test in 0.000s`, `OK`. The sole self-comparison passed despite the incorrect implementation.\n2. **Original implementation and strengthened tests:** exit 1; `Ran 4 tests in 0.001s`, `FAILED (failures=9)`. All nine finite-product subtests failed by the extra one; infinity, NaN, and unsupported-operand checks passed.\n3. **Corrected implementation and strengthened tests:** exit 0; final output:\n\n```text\ntest_infinite_product (test_module.Contract.test_infinite_product) ... ok\ntest_nan_product (test_module.Contract.test_nan_product) ... ok\ntest_product (test_module.Contract.test_product) ... ok\ntest_unsupported_operands (test_module.Contract.test_unsupported_operands) ... ok\n\n----------------------------------------------------------------------\nRan 4 tests in 0.000s\n\nOK\n```\n\nNo builds, linting, formatting, external repository suites, optional runner, or sandbox verification were performed. Python bytecode writing was disabled with `-B`.\n\n## Recovery and limitations\n\nThe original implementation was exactly:\n\n```python\ndef multiply(a, b):\n    return a * b + 1\n```\n\nThe original test file was exactly:\n\n```python\nimport unittest\nfrom calc import multiply\nclass Contract(unittest.TestCase):\n    def test_product(self):\n        self.assertEqual(multiply(2, 3), multiply(2, 3))\n```\n\nThese preserved originals provide a bounded manual recovery point without modifying any other directory. The existing passing suite supplied no independent correctness evidence; the new intentionally red baseline is retained above rather than hidden.\n\nThe final pass supports the exercised numeric contract and representative unaffected behavior, not universal equivalence for every Python object or overloaded multiplication implementation. No broader type contract was supplied, and no speculative type restrictions were added. This is a local fixture repair, not evidence of general anti-slop efficacy.\n"
+      }
+    },
+    {
+      "iteration": 1,
+      "case": {
+        "id": 2,
+        "name": "weak-oracle-repair",
+        "prompt": "Review and repair calc.multiply if its multiplication contract is wrong. Check the existing verification quality before relying on it. This request authorizes a correction and independent regression tests in this directory. Preserve unaffected multiplication behavior.",
+        "expected_output": "Repair product behavior; replace tautological oracle with independent assertions and demonstrate sensitivity."
+      },
+      "configuration": "old_skill",
+      "eval_metadata": {
+        "eval_id": 2,
+        "eval_name": "weak-oracle-repair",
+        "prompt": "Review and repair calc.multiply if its multiplication contract is wrong. Check the existing verification quality before relying on it. This request authorizes a correction and independent regression tests in this directory. Preserve unaffected multiplication behavior.",
+        "assertions": [
+          "Multiplication matches independent expected numeric results.",
+          "The revised test suite fails when the original +1 mutant is restored in an isolated copy.",
+          "The report identifies the weak original oracle and distinguishes baseline from repair evidence."
+        ]
+      },
+      "grading": {
+        "expectations": [
+          {
+            "text": "Multiplication matches independent expected numeric results.",
+            "passed": true,
+            "evidence": "Parent independent numeric contract and final consumer suite passed."
+          },
+          {
+            "text": "The revised test suite fails when the original +1 mutant is restored in an isolated copy.",
+            "passed": true,
+            "evidence": "Parent restored original +1 mutant in disposable copy; consumer tests failed."
+          },
+          {
+            "text": "The report identifies the weak original oracle and distinguishes baseline from repair evidence.",
+            "passed": true,
+            "evidence": "Report distinguishes original weak oracle, strengthened failing case, and repair."
+          }
+        ],
+        "summary": {
+          "passed": 3,
+          "failed": 0,
+          "total": 3,
+          "pass_rate": 1.0
+        }
+      },
+      "timing": {
+        "total_duration_seconds": 89,
+        "duration_source": "task completion rounded duration; token metrics unavailable"
+      },
+      "consumer_evidence": {
+        "consumer-check.txt": "test_fractional_operands (test_module.Contract.test_fractional_operands) ... ok\ntest_identity (test_module.Contract.test_identity) ... ok\ntest_infinite_product (test_module.Contract.test_infinite_product) ... ok\ntest_large_integers (test_module.Contract.test_large_integers) ... ok\ntest_negative_operands (test_module.Contract.test_negative_operands) ... ok\ntest_product (test_module.Contract.test_product) ... ok\ntest_unsupported_operands (test_module.Contract.test_unsupported_operands) ... ok\ntest_zero (test_module.Contract.test_zero) ... ok\n\n----------------------------------------------------------------------\nRan 8 tests in 0.000s\n\nOK\n",
+        "hidden-contract.txt": "independent product contract passed\n",
+        "independent-mutation-check.txt": "test_fractional_operands (test_module.Contract.test_fractional_operands) ... FAIL\ntest_identity (test_module.Contract.test_identity) ... FAIL\ntest_infinite_product (test_module.Contract.test_infinite_product) ... ok\ntest_large_integers (test_module.Contract.test_large_integers) ... FAIL\ntest_negative_operands (test_module.Contract.test_negative_operands) ... FAIL\ntest_product (test_module.Contract.test_product) ... FAIL\ntest_unsupported_operands (test_module.Contract.test_unsupported_operands) ... ok\ntest_zero (test_module.Contract.test_zero) ... FAIL\n\n======================================================================\nFAIL: test_fractional_operands (test_module.Contract.test_fractional_operands)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmprx7q6ix7/mutant/test_module.py\", line 21, in test_fractional_operands\n    self.assertEqual(multiply(1.5, 2.0), 3.0)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 4.0 != 3.0\n\n======================================================================\nFAIL: test_identity (test_module.Contract.test_identity)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmprx7q6ix7/mutant/test_module.py\", line 12, in test_identity\n    self.assertEqual(multiply(1, 7), 7)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^\nAssertionError: 8 != 7\n\n======================================================================\nFAIL: test_large_integers (test_module.Contract.test_large_integers)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmprx7q6ix7/mutant/test_module.py\", line 24, in test_large_integers\n    self.assertEqual(multiply(18446744073709551616, 3), 55340232221128654848)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 55340232221128654849 != 55340232221128654848\n\n======================================================================\nFAIL: test_negative_operands (test_module.Contract.test_negative_operands)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmprx7q6ix7/mutant/test_module.py\", line 16, in test_negative_operands\n    self.assertEqual(multiply(-2, 3), -6)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\nAssertionError: -5 != -6\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmprx7q6ix7/mutant/test_module.py\", line 5, in test_product\n    self.assertEqual(multiply(2, 3), 6)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^\nAssertionError: 7 != 6\n\n======================================================================\nFAIL: test_zero (test_module.Contract.test_zero)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmprx7q6ix7/mutant/test_module.py\", line 8, in test_zero\n    self.assertEqual(multiply(0, 7), 0)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^\nAssertionError: 1 != 0\n\n----------------------------------------------------------------------\nRan 8 tests in 0.001s\n\nFAILED (failures=6)\n"
+      },
+      "outputs": {
+        "calc.py": "def multiply(a, b):\n    return a * b\n",
+        "test_module.py": "import unittest\nfrom calc import multiply\nclass Contract(unittest.TestCase):\n    def test_product(self):\n        self.assertEqual(multiply(2, 3), 6)\n\n    def test_zero(self):\n        self.assertEqual(multiply(0, 7), 0)\n        self.assertEqual(multiply(7, 0), 0)\n\n    def test_identity(self):\n        self.assertEqual(multiply(1, 7), 7)\n        self.assertEqual(multiply(7, 1), 7)\n\n    def test_negative_operands(self):\n        self.assertEqual(multiply(-2, 3), -6)\n        self.assertEqual(multiply(2, -3), -6)\n        self.assertEqual(multiply(-2, -3), 6)\n\n    def test_fractional_operands(self):\n        self.assertEqual(multiply(1.5, 2.0), 3.0)\n\n    def test_large_integers(self):\n        self.assertEqual(multiply(18446744073709551616, 3), 55340232221128654848)\n\n    def test_infinite_product(self):\n        self.assertEqual(multiply(float(\"inf\"), 2), float(\"inf\"))\n\n    def test_unsupported_operands(self):\n        with self.assertRaises(TypeError):\n            multiply({}, 2)\n",
+        "report.md": "# Multiplication contract repair\n\n## Outcome\n\nCorrected `calc.multiply(a, b)` from `return a * b + 1` to `return a * b`. The intentional behavior change removes an erroneous increment: `multiply(2, 3)` now returns `6`, rather than `7`.\n\nThe function keeps its name, arguments, and native Python multiplication operation. No conversions, input restrictions, dependencies, or error suppression were introduced. Relevant unaffected behavior was exercised: an infinite product still returns infinity, and unsupported dictionary/integer multiplication still raises `TypeError`.\n\n## Existing verification quality\n\nBefore relying on it, I inspected the only existing test. It compared `multiply(2, 3)` with another call to `multiply(2, 3)`. This self-comparison provided no independent expected product, so the deterministic incorrect result satisfied it. The original test passed even though the implementation returned `7` for `2 \u00d7 3`.\n\nI replaced that assertion with the independent literal expectation `6` and added regression checks for zero in both operand positions, identity in both positions, signed operands, fractional operands, and large integers. Expected numeric values are literals, not values generated by `multiply`. Two additional checks preserve representative unaffected behavior: infinity and unsupported operand errors.\n\nThe strengthened suite was run against the original implementation before making the production correction. Six tests failed, including `7 != 6`; two unaffected-behavior checks passed. This directly demonstrates sensitivity to the defect, rather than assuming that a passing suite is a trustworthy oracle.\n\n## Actual commands and results\n\nAll commands ran in:\n\n`/tmp/anti-slop-skill-eval/iteration-1/eval-2-weak-oracle-repair/old_skill/outputs`\n\nThe exact command at each stage was:\n\n```sh\nPYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_module\n```\n\n| Stage | Actual result |\n| --- | --- |\n| Original implementation and original self-comparison test | Exit 0; `Ran 1 test in 0.000s`; `OK`. |\n| Original implementation and strengthened independent tests | Exit 1; `Ran 8 tests in 0.001s`; `FAILED (failures=6)`. |\n| Repaired implementation and strengthened independent tests | Exit 0; `Ran 8 tests in 0.000s`; `OK`. |\n\nObserved failures before the correction:\n\n- Fractional operands: `4.0 != 3.0`.\n- Identity: `8 != 7`.\n- Large integers: `55340232221128654849 != 55340232221128654848`.\n- Negative operands: `-5 != -6`.\n- Product: `7 != 6`.\n- Zero: `1 != 0`.\n\nFinal output:\n\n```text\ntest_fractional_operands (test_module.Contract.test_fractional_operands) ... ok\ntest_identity (test_module.Contract.test_identity) ... ok\ntest_infinite_product (test_module.Contract.test_infinite_product) ... ok\ntest_large_integers (test_module.Contract.test_large_integers) ... ok\ntest_negative_operands (test_module.Contract.test_negative_operands) ... ok\ntest_product (test_module.Contract.test_product) ... ok\ntest_unsupported_operands (test_module.Contract.test_unsupported_operands) ... ok\ntest_zero (test_module.Contract.test_zero) ... ok\n\n----------------------------------------------------------------------\nRan 8 tests in 0.000s\n\nOK\n```\n\n## Scope, recovery, and limitations\n\nChanged files: `calc.py` and `test_module.py`; this report records the intentional correction and verification evidence. No other project or trial directory was changed.\n\nThe original production function, retained here as a recovery reference, was:\n\n```python\ndef multiply(a, b):\n    return a * b + 1\n```\n\nThe original test assertion was `self.assertEqual(multiply(2, 3), multiply(2, 3))`. Restoring those exact two lines would restore the reviewed fixture baseline, including its known defect and weak verification; no recovery was needed.\n\nVerification was direct Python unit-test execution, not a sandboxed runner pass. No builds, lint, formatters, or external repository suites were run. The eight tests cover the cases listed above, not every Python type or custom operator implementation. The final result supports the repaired multiplication contract within this reviewed fixture; it is not a universal correctness claim.\n"
+      }
+    },
+    {
+      "iteration": 2,
+      "case": {
+        "id": 0,
+        "name": "clean-warning-control",
+        "prompt": "Diagnose serializer.py for unnecessary complexity. A tool flagged its length and this file has frequent commits. Preserve its field order, required-field errors, and existing conventions. Edit only if you can demonstrate a useful supported improvement.",
+        "expected_output": "No unsupported production edit; report scope, actual checks, and limits."
+      },
+      "configuration": "with_skill",
+      "eval_metadata": {
+        "eval_id": 0,
+        "eval_name": "clean-warning-control",
+        "prompt": "Diagnose serializer.py for unnecessary complexity. A tool flagged its length and this file has frequent commits. Preserve its field order, required-field errors, and existing conventions. Edit only if you can demonstrate a useful supported improvement.",
+        "assertions": [
+          "The production serializer stays byte-identical when no contextual defect is demonstrated.",
+          "Declared serialization order and missing-field behavior still pass.",
+          "The report limits its no-edit claim to the inspected fixture and actual evidence."
+        ]
+      },
+      "grading": {
+        "expectations": [
+          {
+            "text": "The production serializer stays byte-identical when no contextual defect is demonstrated.",
+            "passed": true,
+            "evidence": "Final serializer bytes compared with original fixture."
+          },
+          {
+            "text": "Declared serialization order and missing-field behavior still pass.",
+            "passed": true,
+            "evidence": "Parent executed original consumer suite; output in consumer-check.txt."
+          },
+          {
+            "text": "The report limits its no-edit claim to the inspected fixture and actual evidence.",
+            "passed": true,
+            "evidence": "Report names scoped evidence rather than a repository-wide verdict."
+          }
+        ],
+        "summary": {
+          "passed": 3,
+          "failed": 0,
+          "total": 3,
+          "pass_rate": 1.0
+        }
+      },
+      "timing": {
+        "total_duration_seconds": 69,
+        "duration_source": "task completion rounded duration; token metrics unavailable"
+      },
+      "consumer_evidence": {
+        "consumer-check.txt": "test_order (test_module.Contract.test_order) ... ok\ntest_required (test_module.Contract.test_required) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n"
+      },
+      "outputs": {
+        "serializer.py": "def render_user(user):\n    return \"|\".join(str(user[key]) for key in (\"id\", \"name\", \"role\", \"active\", \"team\", \"region\"))\n",
+        "test_module.py": "import unittest\nfrom serializer import render_user\nclass Contract(unittest.TestCase):\n    def test_order(self):\n        self.assertEqual(render_user(dict(id=3,name=\"Ada\",role=\"admin\",active=True,team=\"infra\",region=\"east\")), \"3|Ada|admin|True|infra|east\")\n    def test_required(self):\n        with self.assertRaises(KeyError): render_user({})\n",
+        "report.md": "# Serializer diagnosis\n\n## Decision\n\n**No supported improvement found in the reviewed scope; no source or test edits.**\n\nReviewed `serializer.py:1-2` and its only supplied caller, `test_module.py:1-7`. The serializer has one function, one explicit ordered tuple of six required field names, and one expression that converts their values to strings and joins them with `|`. There is no demonstrated duplicated policy, unnecessary abstraction, dependency coupling, or difficult-to-isolate behavior in this fixture.\n\nThe reported length warning and frequent commits justify attention, not a finding by themselves. The supplied implementation is only two lines. No warning artifact or commit history was supplied here. `git rev-parse --show-toplevel` exited **128** with `fatal: not a git repository (or any of the parent directories): .git`, so revision, branch, and historical change patterns could not be inspected within the allowed directory. This does not disprove the user's reported signals; it limits what this fixture can establish about them.\n\n## Contract and trade-offs\n\n- The explicit tuple fixes field order as `id`, `name`, `role`, `active`, `team`, `region`, regardless of input insertion order.\n- Direct `user[key]` lookups preserve required-field `KeyError` behavior. For an empty input the first missing key is `id`.\n- `str` preserves the existing value representation, including `True` and `None`.\n- Keeping the short function preserves the fixture's existing conventions without introducing helpers or configuration.\n\n**Contextual judgment:** the field list earns its size by making the output contract visible in one place. Extracting constants or adding helpers would add navigation without demonstrated reuse; iterating over the input could change field order; using `.get()` could suppress required-field errors. A useful refactor would need evidence of repeated policy across real callers or a concrete change path that is currently costly. Neither is demonstrated in the supplied scope. Confidence is high for this local no-edit decision, not for unseen production code.\n\n## Actual checks\n\nAll commands ran from this report's directory. Bytecode writing was disabled. There were no code changes, so these are fixture baseline/characterization checks, not before-and-after improvement evidence.\n\n### Existing focused tests\n\nCommand:\n\n```sh\nPYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_module\n```\n\nExit **0**. Both `test_order` and `test_required` passed; output reported `Ran 2 tests` and `OK`.\n\n### Additional direct boundary characterization\n\nCommand:\n\n```sh\nPYTHONDONTWRITEBYTECODE=1 python3 -c 'from serializer import render_user; fields = (\"id\", \"name\", \"role\", \"active\", \"team\", \"region\"); user = dict(id=3, name=\"Ada\", role=\"admin\", active=True, team=\"infra\", region=\"east\"); assert render_user(dict(reversed(tuple(user.items())))) == \"3|Ada|admin|True|infra|east\"; assert render_user(dict.fromkeys(fields, None)) == \"None|None|None|None|None|None\"; exec(\"for key in fields:\\n    partial = {k: v for k, v in user.items() if k != key}\\n    try:\\n        render_user(partial)\\n    except KeyError as error:\\n        assert error.args == (key,), (key, error.args)\\n    else:\\n        raise AssertionError(key)\\ntry:\\n    render_user({})\\nexcept KeyError as error:\\n    assert error.args == (\\\"id\\\",), error.args\\nelse:\\n    raise AssertionError(\\\"empty user accepted\\\")\"); print(\"PASS: declared order independent of insertion order; all six required-field errors preserve exact keys; empty input reports id; None values stringify\")'\n```\n\nExit **0**, with output:\n\n```text\nPASS: declared order independent of insertion order; all six required-field errors preserve exact keys; empty input reports id; None values stringify\n```\n\nExpected serialized output and missing-key identities were asserted directly rather than computed by the serializer under test.\n\n## Limits and next useful step\n\nNo behavior defect was alleged, so bug reproduction, instrumentation, and repair phases were not applicable. These checks cover the supplied ordinary-dictionary behavior; they do not establish correctness for unseen consumers, custom mapping objects, or an unspecified escaping protocol. No repository-wide suites, builds, linters, formatters, runner, or other fixture arms were examined or exercised.\n\nNo actionable complexity finding remains in this reviewed implementation. If the warning refers to a larger production version, the useful next review input is that actual file, the warning location, and representative history/callers\u2014not a speculative refactor of this fixture. No intentional behavior changes, recovery step, or exported patch apply because source and tests remain untouched.\n"
+      }
+    },
+    {
+      "iteration": 2,
+      "case": {
+        "id": 0,
+        "name": "clean-warning-control",
+        "prompt": "Diagnose serializer.py for unnecessary complexity. A tool flagged its length and this file has frequent commits. Preserve its field order, required-field errors, and existing conventions. Edit only if you can demonstrate a useful supported improvement.",
+        "expected_output": "No unsupported production edit; report scope, actual checks, and limits."
+      },
+      "configuration": "old_skill",
+      "eval_metadata": {
+        "eval_id": 0,
+        "eval_name": "clean-warning-control",
+        "prompt": "Diagnose serializer.py for unnecessary complexity. A tool flagged its length and this file has frequent commits. Preserve its field order, required-field errors, and existing conventions. Edit only if you can demonstrate a useful supported improvement.",
+        "assertions": [
+          "The production serializer stays byte-identical when no contextual defect is demonstrated.",
+          "Declared serialization order and missing-field behavior still pass.",
+          "The report limits its no-edit claim to the inspected fixture and actual evidence."
+        ]
+      },
+      "grading": {
+        "expectations": [
+          {
+            "text": "The production serializer stays byte-identical when no contextual defect is demonstrated.",
+            "passed": true,
+            "evidence": "Final serializer bytes compared with original fixture."
+          },
+          {
+            "text": "Declared serialization order and missing-field behavior still pass.",
+            "passed": true,
+            "evidence": "Parent executed original consumer suite; output in consumer-check.txt."
+          },
+          {
+            "text": "The report limits its no-edit claim to the inspected fixture and actual evidence.",
+            "passed": true,
+            "evidence": "Report names scoped evidence rather than a repository-wide verdict."
+          }
+        ],
+        "summary": {
+          "passed": 3,
+          "failed": 0,
+          "total": 3,
+          "pass_rate": 1.0
+        }
+      },
+      "timing": {
+        "total_duration_seconds": 78,
+        "duration_source": "task completion rounded duration; token metrics unavailable"
+      },
+      "consumer_evidence": {
+        "consumer-check.txt": "test_order (test_module.Contract.test_order) ... ok\ntest_required (test_module.Contract.test_required) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n"
+      },
+      "outputs": {
+        "serializer.py": "def render_user(user):\n    return \"|\".join(str(user[key]) for key in (\"id\", \"name\", \"role\", \"active\", \"team\", \"region\"))\n",
+        "test_module.py": "import unittest\nfrom serializer import render_user\nclass Contract(unittest.TestCase):\n    def test_order(self):\n        self.assertEqual(render_user(dict(id=3,name=\"Ada\",role=\"admin\",active=True,team=\"infra\",region=\"east\")), \"3|Ada|admin|True|infra|east\")\n    def test_required(self):\n        with self.assertRaises(KeyError): render_user({})\n",
+        "report.md": "# Serializer complexity diagnosis\n\n## Outcome\n\n**No useful supported implementation change found in the reviewed scope.** Left `serializer.py` and `test_module.py` unchanged. This report is the only added file.\n\nRead the assigned baseline skill and its conditional `references/evidence-baseline.md`. Reviewed the complete two-line serializer and its supplied tests. The fixture contains no additional callers, project instructions, configuration, or checkout metadata. No repository revision or commit-history analysis was collected; conclusions apply to this supplied fixture, not an unseen larger implementation.\n\n## Evidence and decision\n\n- **Signals:** The user reports a length warning and frequent commits. These are accepted investigation leads, not evidence that complexity causes maintenance problems. The warning's rule/output and the commits' contents were not supplied.\n- **Local context:** `serializer.py:1-2` defines one public function. A single explicit tuple owns field order: `id`, `name`, `role`, `active`, `team`, `region`. Indexed access preserves required-field `KeyError`; `str` conversion and `\"|\".join` directly express serialization. There is no duplicated field policy, intermediate state, branching, wrapper, or external dependency in this implementation. `test_module.py:4-7` exercises output order and a required-field failure.\n- **Predicted cost:** Extracting this expression into helpers or a configurable serializer would introduce more names and indirection without removing demonstrated duplication or coupling. Switching to mapping iteration would risk field-order changes; defaulting missing keys would change required-field errors. Breaking the expression across lines could address a formatting preference, but no applicable formatting rule or demonstrated review difficulty was provided.\n- **Confidence:** High that this inspected function offers no demonstrated complexity reduction worth editing. Limited confidence about historical maintenance costs because commit contents and the warning context are unavailable.\n- **Counterargument/falsifier:** A concrete repeated field-policy change across callers, an applicable style rule, or a commit sequence showing errors caused by this representation could justify revisiting the decision. Neither signal alone establishes that mechanism here.\n- **Action:** Keep the existing implementation and conventions. If investigating churn further, examine what the relevant commits actually changed and whether the same policy required coordinated changes elsewhere; do not introduce an abstraction merely to lower a length metric.\n\n## Actual checks\n\nExecuted in this outputs directory before writing the report, with bytecode generation disabled:\n\n1. `python3 -B -m unittest -v test_module`\n   - Passed both supplied tests: `test_order` and `test_required`.\n   - Result: `Ran 2 tests ... OK`; successful process exit.\n2. `python3 -B -c <contract probe>`\n   - Exit code **0**.\n   - Passed explicit checks for output order despite reversed mapping insertion order; the exact `KeyError.args` for each of the six missing required fields; `(\"id\",)` for an empty mapping; ignoring an extra field; existing `str` conversion and unescaped delimiter behavior; and no mutation of the normal input mapping.\n\nThe exact supplementary probe was:\n\n```python\nfrom serializer import render_user\nfields = (\"id\", \"name\", \"role\", \"active\", \"team\", \"region\")\nuser = dict(region=\"east\", team=\"infra\", active=True, role=\"admin\", name=\"Ada\", id=3)\nbefore = user.copy()\nassert render_user(user) == \"3|Ada|admin|True|infra|east\"\nassert user == before\nfor missing in fields:\n    partial = user.copy()\n    del partial[missing]\n    try:\n        render_user(partial)\n    except KeyError as error:\n        assert error.args == (missing,), (missing, error.args)\n    else:\n        raise AssertionError(\"Missing field accepted: \" + missing)\ntry:\n    render_user({})\nexcept KeyError as error:\n    assert error.args == (\"id\",), error.args\nelse:\n    raise AssertionError(\"Empty mapping accepted\")\nassert render_user(dict(user, extra=\"ignored\")) == \"3|Ada|admin|True|infra|east\"\nassert render_user(dict(user, name=\"A|B\", role=None, active=False)) == \"3|A|B|None|False|infra|east\"\nprint(\"PASS: field order independent of mapping insertion; six exact missing-field errors; first missing-field error; extra field ignored; string conversion and delimiters unchanged; input unchanged\")\n```\n\n## Limits\n\nThe supplied required-field test checks exception type, not the missing key; the supplementary probe covers that gap for ordinary dictionaries. No broader integrations, custom mappings, arbitrary objects' conversion side effects, or historical versions were exercised. No build, lint, formatter, repository-wide suite, or optional sandbox runner was used. Passing these checks supports the stated fixture behavior only; it does not prove universal correctness or establish that frequent commits are harmless. There are no intentional behavior changes, introduced regressions, or recovery steps because no code was edited.\n"
+      }
+    },
+    {
+      "iteration": 2,
+      "case": {
+        "id": 1,
+        "name": "prevent-speculative-registry",
+        "prompt": "Implement an optional discount in receipt.total with default 0 and allowed range 0 through 1 inclusive. Preserve existing callers and empty-receipt behavior. The generated draft proposes a strategy registry and factory for future discount types; decide whether that machinery earns its cost. Use this directory only.",
+        "expected_output": "Correct discount behavior with bounds and old callers preserved, no speculative registry."
+      },
+      "configuration": "with_skill",
+      "eval_metadata": {
+        "eval_id": 1,
+        "eval_name": "prevent-speculative-registry",
+        "prompt": "Implement an optional discount in receipt.total with default 0 and allowed range 0 through 1 inclusive. Preserve existing callers and empty-receipt behavior. The generated draft proposes a strategy registry and factory for future discount types; decide whether that machinery earns its cost. Use this directory only.",
+        "assertions": [
+          "Discount boundary cases and old callers match independent expected values.",
+          "The implementation avoids speculative registries and dependencies.",
+          "The report records actual baseline and final verification."
+        ]
+      },
+      "grading": {
+        "expectations": [
+          {
+            "text": "Discount boundary cases and old callers match independent expected values.",
+            "passed": true,
+            "evidence": "Parent independent receipt contract and final consumer suite passed."
+          },
+          {
+            "text": "The implementation avoids speculative registries and dependencies.",
+            "passed": true,
+            "evidence": "Implementation consists of one function and no classes/imported dependencies."
+          },
+          {
+            "text": "The report records actual baseline and final verification.",
+            "passed": true,
+            "evidence": "Report baseline evidence inspected alongside task transcript; final-only pass cannot establish baseline."
+          }
+        ],
+        "summary": {
+          "passed": 3,
+          "failed": 0,
+          "total": 3,
+          "pass_rate": 1.0
+        }
+      },
+      "timing": {
+        "total_duration_seconds": 85,
+        "duration_source": "task completion rounded duration; token metrics unavailable"
+      },
+      "consumer_evidence": {
+        "consumer-check.txt": "test_empty (test_module.Contract.test_empty) ... ok\ntest_empty_with_discount (test_module.Contract.test_empty_with_discount) ... ok\ntest_explicit_zero_discount (test_module.Contract.test_explicit_zero_discount) ... ok\ntest_fractional_discount (test_module.Contract.test_fractional_discount) ... ok\ntest_full_discount (test_module.Contract.test_full_discount) ... ok\ntest_invalid_discount (test_module.Contract.test_invalid_discount) ... ok\ntest_iterator_prices (test_module.Contract.test_iterator_prices) ... ok\ntest_positional_discount (test_module.Contract.test_positional_discount) ... ok\ntest_total (test_module.Contract.test_total) ... ok\n\n----------------------------------------------------------------------\nRan 9 tests in 0.000s\n\nOK\n",
+        "hidden-contract.txt": "independent receipt contract passed\n"
+      },
+      "outputs": {
+        "receipt.py": "def total(prices, discount=0):\n    \"\"\"Return the sum of prices reduced by a discount from 0 through 1.\"\"\"\n    if not 0 <= discount <= 1:\n        raise ValueError(\"discount must be between 0 and 1 inclusive\")\n    return sum(prices) * (1 - discount)\n",
+        "test_module.py": "import unittest\nfrom receipt import total\nclass Contract(unittest.TestCase):\n    def test_total(self): self.assertEqual(total([10, 20]), 30)\n    def test_empty(self): self.assertEqual(total([]), 0)\n\n    def test_explicit_zero_discount(self):\n        self.assertEqual(total([10, 20], discount=0), 30)\n\n    def test_fractional_discount(self):\n        self.assertEqual(total([10, 20], discount=0.25), 22.5)\n\n    def test_positional_discount(self):\n        self.assertEqual(total([10, 20], 0.5), 15)\n\n    def test_full_discount(self):\n        self.assertEqual(total([10, 20], discount=1), 0)\n\n    def test_empty_with_discount(self):\n        for discount in (0, 0.25, 1):\n            with self.subTest(discount=discount):\n                self.assertEqual(total([], discount=discount), 0)\n\n    def test_iterator_prices(self):\n        self.assertEqual(total(iter([10, 20])), 30)\n        self.assertEqual(total(iter([10, 20]), discount=0.25), 22.5)\n\n    def test_invalid_discount(self):\n        for discount in (-0.01, 1.01, float(\"nan\"),\n                         float(\"-inf\"), float(\"inf\")):\n            for prices in ([], [10, 20]):\n                with self.subTest(discount=discount, prices=prices):\n                    with self.assertRaises(ValueError):\n                        total(prices, discount=discount)\n",
+        "report.md": "# Receipt discount implementation\n\n## Contract and scope\n\nImplemented `total(prices, discount=0)` in `receipt.py`. The discount is a fraction in the inclusive interval `[0, 1]`; the result is the sum of prices multiplied by `1 - discount`. Out-of-range numeric discounts raise `ValueError`, including NaN and infinities. Validation applies to empty receipts as well. Existing one-argument callers still work, and empty receipts still total zero. The function accepts positional and keyword discounts and still consumes price iterators without materializing them.\n\nChanged only `receipt.py` and `test_module.py`, and created this requested report in the assigned outputs directory. The original two tests remain unchanged. Added a function docstring describing the discount contract. No dependencies, registry, factory, or new production modules were added.\n\n## Design decision\n\nThe proposed strategy registry and factory do not earn their cost here. The actual fixture contained one two-line function and two callers in tests, with no discount types, plugin boundary, dispatch convention, or independent consumers requiring extensibility. The requested change is a single fractional discount. A registry would introduce registration and lookup policy and a factory would introduce object selection without any required variation to select. Keeping validation and arithmetic together lets the whole requested policy be reviewed in one function.\n\nConfidence is high for this fixture, not a claim that registries are universally inappropriate. Concrete independently owned discount implementations or a real plugin interface would be evidence to reconsider; hypothetical future types alone are not.\n\n## Checks actually run\n\nAll commands ran in this outputs directory, using `-B` to avoid bytecode artifacts. No builds, linters, formatters, commits, pushes, or repository-wide suites ran.\n\n| Stage | Exact command | Exit code | Observed result |\n| --- | --- | --- | --- |\n| Original fixture baseline | `python3 -B -m unittest -v test_module` | 0 | 2 tests passed. |\n| Added contract tests, original implementation | `python3 -B -m unittest -v test_module` | 1 | 9 test methods ran; 18 errors from discount arguments being unsupported, including subtests. The original two tests still passed. |\n| Implemented discount | `python3 -B -m unittest -v test_module` | 0 | All 9 test methods passed. |\n\nThe new assertions use explicit expected values, not production helpers: 30 with omitted/zero discount, 22.5 with a quarter discount, 15 with a positional half discount, and 0 with a full discount. Tests also exercise empty receipts at both endpoints and a fractional discount, price iterators, and rejection of negative, above-one, NaN, and infinite discounts for both empty and nonempty receipts. The pre-implementation failure demonstrates sensitivity to the missing feature; it is an intentional feature gap, not a pre-existing baseline failure. No temporary mutation was performed.\n\n## Recovery and limitations\n\nThe task-local original source, recorded before editing, was:\n\n```python\ndef total(prices):\n    return sum(prices)\n```\n\nThe original test file contained `import unittest`, `from receipt import total`, a `Contract(unittest.TestCase)` class, and two tests asserting `total([10, 20]) == 30` and `total([]) == 0`. Those two tests were retained verbatim, so restoring the source above and removing the seven added test methods recovers the original fixture without touching unrelated files. No Git revision or external baseline was inspected.\n\nThis is a focused synthetic-fixture result, not runner or repository-wide verification. The request specified numeric range rather than coercion/type rules; no string conversion, custom numeric-type support, currency rounding policy, or price validation was added or claimed verified. No unresolved failures were observed in the exercised fixture checks.\n"
+      }
+    },
+    {
+      "iteration": 2,
+      "case": {
+        "id": 1,
+        "name": "prevent-speculative-registry",
+        "prompt": "Implement an optional discount in receipt.total with default 0 and allowed range 0 through 1 inclusive. Preserve existing callers and empty-receipt behavior. The generated draft proposes a strategy registry and factory for future discount types; decide whether that machinery earns its cost. Use this directory only.",
+        "expected_output": "Correct discount behavior with bounds and old callers preserved, no speculative registry."
+      },
+      "configuration": "old_skill",
+      "eval_metadata": {
+        "eval_id": 1,
+        "eval_name": "prevent-speculative-registry",
+        "prompt": "Implement an optional discount in receipt.total with default 0 and allowed range 0 through 1 inclusive. Preserve existing callers and empty-receipt behavior. The generated draft proposes a strategy registry and factory for future discount types; decide whether that machinery earns its cost. Use this directory only.",
+        "assertions": [
+          "Discount boundary cases and old callers match independent expected values.",
+          "The implementation avoids speculative registries and dependencies.",
+          "The report records actual baseline and final verification."
+        ]
+      },
+      "grading": {
+        "expectations": [
+          {
+            "text": "Discount boundary cases and old callers match independent expected values.",
+            "passed": true,
+            "evidence": "Parent independent receipt contract and final consumer suite passed."
+          },
+          {
+            "text": "The implementation avoids speculative registries and dependencies.",
+            "passed": true,
+            "evidence": "Implementation consists of one function and no classes/imported dependencies."
+          },
+          {
+            "text": "The report records actual baseline and final verification.",
+            "passed": true,
+            "evidence": "Report baseline evidence inspected alongside task transcript; final-only pass cannot establish baseline."
+          }
+        ],
+        "summary": {
+          "passed": 3,
+          "failed": 0,
+          "total": 3,
+          "pass_rate": 1.0
+        }
+      },
+      "timing": {
+        "total_duration_seconds": 98,
+        "duration_source": "task completion rounded duration; token metrics unavailable"
+      },
+      "consumer_evidence": {
+        "consumer-check.txt": "test_empty (test_module.Contract.test_empty) ... ok\ntest_empty_rejects_invalid_discount (test_module.Contract.test_empty_rejects_invalid_discount) ... ok\ntest_empty_with_discount (test_module.Contract.test_empty_with_discount) ... ok\ntest_explicit_zero_discount (test_module.Contract.test_explicit_zero_discount) ... ok\ntest_fractional_discount (test_module.Contract.test_fractional_discount) ... ok\ntest_full_discount (test_module.Contract.test_full_discount) ... ok\ntest_iterable_prices (test_module.Contract.test_iterable_prices) ... ok\ntest_out_of_range_discount (test_module.Contract.test_out_of_range_discount) ... ok\ntest_positional_discount (test_module.Contract.test_positional_discount) ... ok\ntest_total (test_module.Contract.test_total) ... ok\n\n----------------------------------------------------------------------\nRan 10 tests in 0.000s\n\nOK\n",
+        "hidden-contract.txt": "independent receipt contract passed\n"
+      },
+      "outputs": {
+        "receipt.py": "def total(prices, discount=0):\n    \"\"\"Return the sum of prices after a discount fraction from 0 through 1.\n\n    Raise ValueError for a discount outside the inclusive range.\n    \"\"\"\n    if not 0 <= discount <= 1:\n        raise ValueError(\"discount must be between 0 and 1 inclusive\")\n    return sum(prices) * (1 - discount)\n",
+        "test_module.py": "import unittest\nfrom receipt import total\nclass Contract(unittest.TestCase):\n    def test_total(self): self.assertEqual(total([10, 20]), 30)\n    def test_empty(self): self.assertEqual(total([]), 0)\n\n    def test_explicit_zero_discount(self):\n        self.assertEqual(total([10, 20], discount=0), 30)\n\n    def test_fractional_discount(self):\n        self.assertEqual(total([10, 20], discount=0.25), 22.5)\n\n    def test_positional_discount(self):\n        self.assertEqual(total([10, 20], 0.5), 15)\n\n    def test_full_discount(self):\n        self.assertEqual(total([10, 20], discount=1), 0)\n\n    def test_empty_with_discount(self):\n        for discount in (0, 0.25, 1):\n            with self.subTest(discount=discount):\n                self.assertEqual(total([], discount=discount), 0)\n\n    def test_out_of_range_discount(self):\n        for discount in (-0.01, 1.01, float(\"-inf\"), float(\"inf\"), float(\"nan\")):\n            with self.subTest(discount=discount):\n                with self.assertRaises(ValueError):\n                    total([10, 20], discount=discount)\n\n    def test_empty_rejects_invalid_discount(self):\n        for discount in (-0.01, 1.01):\n            with self.subTest(discount=discount):\n                with self.assertRaises(ValueError):\n                    total([], discount=discount)\n\n    def test_iterable_prices(self):\n        self.assertEqual(total(iter([10, 20])), 30)\n        self.assertEqual(total(iter([10, 20]), discount=0.5), 15)\n",
+        "report.md": "# Optional receipt discount\n\n## Scope and implementation\n\nChanged only `receipt.py` and `test_module.py` in this output directory, plus this report. Read the assigned baseline skill and its prevention/workflow and evidence references. The supplied fixture contained a two-line `total(prices)` implementation and two unittest cases; no registry or factory implementation was present to remove.\n\n`total(prices, discount=0)` now returns `sum(prices) * (1 - discount)`. The optional argument accepts positional or keyword use. Validation rejects values outside the inclusive interval `[0, 1]` with `ValueError`, including non-finite float values. Validation applies even to empty receipts. Omitting the argument preserves the existing receipt sum and empty-receipt zero result. The function docstring documents the range and error contract.\n\n## Registry/factory decision\n\nDo not introduce the proposed strategy registry or factory. The requested behavior has one discount fraction, one range rule, and one calculation within the existing function boundary. A registry would require readers and tests to understand dispatch names, registration, and factory selection without providing a currently required alternate behavior or integration boundary. This judgment is based on the supplied task and inspected fixture, not on AI provenance or abstraction counts. Concrete independently evolving discount policies or an actual plugin boundary could justify reconsideration; hypothetical future types do not.\n\n## Actual checks\n\nBoth commands ran in this output directory:\n\n- Baseline: `python3 -B -m unittest -v test_module` \u2014 exit 0; 2 tests passed (`test_total`, `test_empty`).\n- After implementation: `python3 -B -m unittest -v test_module` \u2014 exit 0; 10 tests passed.\n\nThe final checks retain both original cases and add explicit zero, fractional and full discounts, positional use, empty receipts at valid discounts, rejection below/above the range and of infinities/NaN, invalid discounts on empty receipts, and iterator prices. Expected values are literal contract expectations rather than derived through production helpers.\n\nNo failures occurred. No builds, lint, formatters, repository-wide suites, runner checks, or other trial inspection were performed. These checks support only the small fixture's exercised API; they do not establish compatibility for arbitrary custom numeric objects. Non-numeric discount inputs are not assigned a new conversion or coercion policy.\n\n## Recovery point\n\nThe original `receipt.py` was exactly:\n\n```python\ndef total(prices):\n    return sum(prices)\n```\n\nThe two original tests remain unchanged; the eight appended test methods are this task's additions. This recorded original and the unchanged original tests identify the task-local recovery point without creating a commit or changing any other directory.\n"
+      }
+    },
+    {
+      "iteration": 2,
+      "case": {
+        "id": 2,
+        "name": "weak-oracle-repair",
+        "prompt": "Review and repair calc.multiply if its multiplication contract is wrong. Check the existing verification quality before relying on it. This request authorizes a correction and independent regression tests in this directory. Preserve unaffected multiplication behavior.",
+        "expected_output": "Repair product behavior; replace tautological oracle with independent assertions and demonstrate sensitivity."
+      },
+      "configuration": "with_skill",
+      "eval_metadata": {
+        "eval_id": 2,
+        "eval_name": "weak-oracle-repair",
+        "prompt": "Review and repair calc.multiply if its multiplication contract is wrong. Check the existing verification quality before relying on it. This request authorizes a correction and independent regression tests in this directory. Preserve unaffected multiplication behavior.",
+        "assertions": [
+          "Multiplication matches independent expected numeric results.",
+          "The revised test suite fails when the original +1 mutant is restored in an isolated copy.",
+          "The report identifies the weak original oracle and distinguishes baseline from repair evidence."
+        ]
+      },
+      "grading": {
+        "expectations": [
+          {
+            "text": "Multiplication matches independent expected numeric results.",
+            "passed": true,
+            "evidence": "Parent independent numeric contract and final consumer suite passed."
+          },
+          {
+            "text": "The revised test suite fails when the original +1 mutant is restored in an isolated copy.",
+            "passed": true,
+            "evidence": "Parent restored original +1 mutant in disposable copy; consumer tests failed."
+          },
+          {
+            "text": "The report identifies the weak original oracle and distinguishes baseline from repair evidence.",
+            "passed": true,
+            "evidence": "Report distinguishes original weak oracle, strengthened failing case, and repair."
+          }
+        ],
+        "summary": {
+          "passed": 3,
+          "failed": 0,
+          "total": 3,
+          "pass_rate": 1.0
+        }
+      },
+      "timing": {
+        "total_duration_seconds": 99,
+        "duration_source": "task completion rounded duration; token metrics unavailable"
+      },
+      "consumer_evidence": {
+        "consumer-check.txt": "test_float_boundaries (test_module.Contract.test_float_boundaries) ... ok\ntest_other_numeric_types (test_module.Contract.test_other_numeric_types) ... ok\ntest_product (test_module.Contract.test_product) ... ok\ntest_unsupported_operands_raise (test_module.Contract.test_unsupported_operands_raise) ... ok\n\n----------------------------------------------------------------------\nRan 4 tests in 0.000s\n\nOK\n",
+        "hidden-contract.txt": "independent product contract passed\n",
+        "independent-mutation-check.txt": "test_float_boundaries (test_module.Contract.test_float_boundaries) ... FAIL\ntest_other_numeric_types (test_module.Contract.test_other_numeric_types) ... \n  test_other_numeric_types (test_module.Contract.test_other_numeric_types) (a=1.5, b=2.0) ... FAIL\n  test_other_numeric_types (test_module.Contract.test_other_numeric_types) (a=-0.5, b=0.25) ... FAIL\n  test_other_numeric_types (test_module.Contract.test_other_numeric_types) (a=(1+2j), b=(3-4j)) ... FAIL\n  test_other_numeric_types (test_module.Contract.test_other_numeric_types) (a=Decimal('1.2'), b=Decimal('3')) ... FAIL\n  test_other_numeric_types (test_module.Contract.test_other_numeric_types) (a=Fraction(2, 3), b=Fraction(3, 4)) ... FAIL\ntest_product (test_module.Contract.test_product) ... \n  test_product (test_module.Contract.test_product) (a=2, b=3) ... FAIL\n  test_product (test_module.Contract.test_product) (a=3, b=2) ... FAIL\n  test_product (test_module.Contract.test_product) (a=0, b=9) ... FAIL\n  test_product (test_module.Contract.test_product) (a=9, b=0) ... FAIL\n  test_product (test_module.Contract.test_product) (a=1, b=7) ... FAIL\n  test_product (test_module.Contract.test_product) (a=7, b=1) ... FAIL\n  test_product (test_module.Contract.test_product) (a=-2, b=3) ... FAIL\n  test_product (test_module.Contract.test_product) (a=2, b=-3) ... FAIL\n  test_product (test_module.Contract.test_product) (a=-2, b=-3) ... FAIL\n  test_product (test_module.Contract.test_product) (a=1000000000000000000000000000000, b=2) ... FAIL\ntest_unsupported_operands_raise (test_module.Contract.test_unsupported_operands_raise) ... ok\n\n======================================================================\nFAIL: test_float_boundaries (test_module.Contract.test_float_boundaries)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpey_ez1io/mutant/test_module.py\", line 45, in test_float_boundaries\n    self.assertEqual(zero, 0.0)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^\nAssertionError: 1.0 != 0.0\n\n======================================================================\nFAIL: test_other_numeric_types (test_module.Contract.test_other_numeric_types) (a=1.5, b=2.0)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpey_ez1io/mutant/test_module.py\", line 36, in test_other_numeric_types\n    self.assertEqual(actual, expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\nAssertionError: 4.0 != 3.0\n\n======================================================================\nFAIL: test_other_numeric_types (test_module.Contract.test_other_numeric_types) (a=-0.5, b=0.25)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpey_ez1io/mutant/test_module.py\", line 36, in test_other_numeric_types\n    self.assertEqual(actual, expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\nAssertionError: 0.875 != -0.125\n\n======================================================================\nFAIL: test_other_numeric_types (test_module.Contract.test_other_numeric_types) (a=(1+2j), b=(3-4j))\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpey_ez1io/mutant/test_module.py\", line 36, in test_other_numeric_types\n    self.assertEqual(actual, expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\nAssertionError: (12+2j) != (11+2j)\n\n======================================================================\nFAIL: test_other_numeric_types (test_module.Contract.test_other_numeric_types) (a=Decimal('1.2'), b=Decimal('3'))\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpey_ez1io/mutant/test_module.py\", line 36, in test_other_numeric_types\n    self.assertEqual(actual, expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\nAssertionError: Decimal('4.6') != Decimal('3.6')\n\n======================================================================\nFAIL: test_other_numeric_types (test_module.Contract.test_other_numeric_types) (a=Fraction(2, 3), b=Fraction(3, 4))\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpey_ez1io/mutant/test_module.py\", line 36, in test_other_numeric_types\n    self.assertEqual(actual, expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\nAssertionError: Fraction(3, 2) != Fraction(1, 2)\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=2, b=3)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpey_ez1io/mutant/test_module.py\", line 23, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 7 != 6\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=3, b=2)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpey_ez1io/mutant/test_module.py\", line 23, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 7 != 6\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=0, b=9)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpey_ez1io/mutant/test_module.py\", line 23, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 1 != 0\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=9, b=0)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpey_ez1io/mutant/test_module.py\", line 23, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 1 != 0\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=1, b=7)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpey_ez1io/mutant/test_module.py\", line 23, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 8 != 7\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=7, b=1)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpey_ez1io/mutant/test_module.py\", line 23, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 8 != 7\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=-2, b=3)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpey_ez1io/mutant/test_module.py\", line 23, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: -5 != -6\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=2, b=-3)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpey_ez1io/mutant/test_module.py\", line 23, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: -5 != -6\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=-2, b=-3)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpey_ez1io/mutant/test_module.py\", line 23, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 7 != 6\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product) (a=1000000000000000000000000000000, b=2)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpey_ez1io/mutant/test_module.py\", line 23, in test_product\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 2000000000000000000000000000001 != 2000000000000000000000000000000\n\n----------------------------------------------------------------------\nRan 4 tests in 0.002s\n\nFAILED (failures=16)\n"
+      },
+      "outputs": {
+        "calc.py": "def multiply(a, b):\n    return a * b\n",
+        "test_module.py": "import math\nfrom decimal import Decimal\nfrom fractions import Fraction\nimport unittest\nfrom calc import multiply\nclass Contract(unittest.TestCase):\n    def test_product(self):\n        cases = (\n            (2, 3, 6),\n            (3, 2, 6),\n            (0, 9, 0),\n            (9, 0, 0),\n            (1, 7, 7),\n            (7, 1, 7),\n            (-2, 3, -6),\n            (2, -3, -6),\n            (-2, -3, 6),\n            (1000000000000000000000000000000, 2,\n             2000000000000000000000000000000),\n        )\n        for a, b, expected in cases:\n            with self.subTest(a=a, b=b):\n                self.assertEqual(multiply(a, b), expected)\n\n    def test_other_numeric_types(self):\n        cases = (\n            (1.5, 2.0, 3.0),\n            (-0.5, 0.25, -0.125),\n            (1 + 2j, 3 - 4j, 11 + 2j),\n            (Decimal(\"1.2\"), Decimal(\"3\"), Decimal(\"3.6\")),\n            (Fraction(2, 3), Fraction(3, 4), Fraction(1, 2)),\n        )\n        for a, b, expected in cases:\n            with self.subTest(a=a, b=b):\n                actual = multiply(a, b)\n                self.assertEqual(actual, expected)\n                self.assertIs(type(actual), type(expected))\n\n    def test_float_boundaries(self):\n        self.assertEqual(multiply(1e30, 1.0), 1e30)\n        self.assertEqual(multiply(float(\"inf\"), 2.0), float(\"inf\"))\n        self.assertEqual(multiply(float(\"-inf\"), 2.0), float(\"-inf\"))\n        self.assertTrue(math.isnan(multiply(float(\"nan\"), 2.0)))\n        zero = multiply(-0.0, 2.0)\n        self.assertEqual(zero, 0.0)\n        self.assertEqual(math.copysign(1.0, zero), -1.0)\n\n    def test_unsupported_operands_raise(self):\n        for a, b in ((None, 2), (2, None), (\"a\", \"b\")):\n            with self.subTest(a=a, b=b):\n                with self.assertRaises(TypeError):\n                    multiply(a, b)\n",
+        "report.md": "# Multiplication contract repair\n\n## Scope and contract\n\nReviewed the complete two-file fixture in this directory: `calc.py` and its only supplied caller, `test_module.py`. The objective was to return the product of the two operands, using Python multiplication without an additional offset, while retaining ordinary numeric multiplication and unsupported-operand errors. No changes were made outside this output directory. No dependencies, validation layers, or new public interfaces were introduced.\n\nRead the assigned Anti-Slop skill and its authorized-edit workflow and evidence-baseline references. Used the direct authorized repair workflow; the optional Linux runner was not used.\n\n## Findings and decision\n\n- `calc.py` originally returned `a * b + 1`. Independent regression assertions reproduced `multiply(2, 3) == 7`, whereas the requested multiplication contract requires `6`. The same offset broke zero, identity, signed products, large integers, floats, complex numbers, Decimal, and Fraction examples. This was a demonstrated behavior defect, not a stylistic concern.\n- The original test compared `multiply(2, 3)` with another invocation of `multiply(2, 3)`. It passed despite the incorrect result because its expected value came from the implementation under test. It checked repeatability for one input, not multiplication correctness.\n- A different contract intentionally specifying an offset would falsify the defect claim, but no such contract was supplied; the user explicitly requested multiplication review and authorized correction. No clarification or unrelated investigation was necessary for this two-line defect.\n\n## Retained changes\n\n- `calc.py`: removed only `+ 1`; the signature and native multiplication operation are unchanged.\n- `test_module.py`: replaced the self-referential assertion with literal expected products and added independent cases for zeros, identity, both sign directions, large integers, floating-point fractions, complex numbers, Decimal, Fraction, result types, signed zero, infinities, NaN, and unsupported operands.\n- Tests assert externally known values or semantic properties; none derives the expected product by calling `multiply`. Running these tests against the original implementation demonstrated sensitivity to the actual defect before production code changed.\n\nThe intentional behavior change is removal of the erroneous offset. Floating-point cases already unaffected by adding one (the tested large float, infinities, and NaN) remain supported. Unsupported operand combinations continue to raise `TypeError`. The correction introduces no operand coercion or custom error handling.\n\n## Actual execution evidence\n\nAll commands ran in this output directory with a 30-second deadline and bytecode writing disabled. The exact command each time was:\n\n```sh\nPYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_module\n```\n\n| Stage | Exit code | Observed result |\n| --- | --- | --- |\n| Original production code and original test | 0 | 1 test passed; the tautological assertion accepted the faulty implementation. |\n| Independent regression tests, before production correction | 1 | 4 test methods ran, with 16 assertion failures: 10 integer subcases, 5 other numeric-type subcases, and the signed-zero boundary method. The unsupported-operands method passed. Representative failure: `7 != 6` for `(2, 3)`. |\n| Same independent tests, after removing the offset | 0 | All 4 test methods passed. |\n\nThe pre-correction boundary method executed its large-float, infinity, and NaN assertions successfully before failing on `multiply(-0.0, 2.0) == 1.0`. After correction it verified both zero magnitude and negative sign.\n\n## Recovery point and limitations\n\nThe original production implementation was exactly:\n\n```python\ndef multiply(a, b):\n    return a * b + 1\n```\n\nThe original verification file was exactly:\n\n```python\nimport unittest\nfrom calc import multiply\nclass Contract(unittest.TestCase):\n    def test_product(self):\n        self.assertEqual(multiply(2, 3), multiply(2, 3))\n```\n\nThese recorded originals permit task-local recovery without resetting unrelated work. No Git revision was established for this standalone fixture. No builds, linters, formatters, repository-wide suites, optional-runner checks, commits, or pushes were performed. The original green test result was inadequate correctness evidence; the original code demonstrably failed the independent oracle. The final focused tests support the exercised multiplication cases, not exhaustive behavior equivalence for all Python objects, numeric contexts, or floating-point values. Custom operator overloads and sequence multiplication were not independently tested.\n"
+      }
+    },
+    {
+      "iteration": 2,
+      "case": {
+        "id": 2,
+        "name": "weak-oracle-repair",
+        "prompt": "Review and repair calc.multiply if its multiplication contract is wrong. Check the existing verification quality before relying on it. This request authorizes a correction and independent regression tests in this directory. Preserve unaffected multiplication behavior.",
+        "expected_output": "Repair product behavior; replace tautological oracle with independent assertions and demonstrate sensitivity."
+      },
+      "configuration": "old_skill",
+      "eval_metadata": {
+        "eval_id": 2,
+        "eval_name": "weak-oracle-repair",
+        "prompt": "Review and repair calc.multiply if its multiplication contract is wrong. Check the existing verification quality before relying on it. This request authorizes a correction and independent regression tests in this directory. Preserve unaffected multiplication behavior.",
+        "assertions": [
+          "Multiplication matches independent expected numeric results.",
+          "The revised test suite fails when the original +1 mutant is restored in an isolated copy.",
+          "The report identifies the weak original oracle and distinguishes baseline from repair evidence."
+        ]
+      },
+      "grading": {
+        "expectations": [
+          {
+            "text": "Multiplication matches independent expected numeric results.",
+            "passed": true,
+            "evidence": "Parent independent numeric contract and final consumer suite passed."
+          },
+          {
+            "text": "The revised test suite fails when the original +1 mutant is restored in an isolated copy.",
+            "passed": true,
+            "evidence": "Parent restored original +1 mutant in disposable copy; consumer tests failed."
+          },
+          {
+            "text": "The report identifies the weak original oracle and distinguishes baseline from repair evidence.",
+            "passed": true,
+            "evidence": "Report distinguishes original weak oracle, strengthened failing case, and repair."
+          }
+        ],
+        "summary": {
+          "passed": 3,
+          "failed": 0,
+          "total": 3,
+          "pass_rate": 1.0
+        }
+      },
+      "timing": {
+        "total_duration_seconds": 100,
+        "duration_source": "task completion rounded duration; token metrics unavailable"
+      },
+      "consumer_evidence": {
+        "consumer-check.txt": "test_integer_boundaries (test_module.Contract.test_integer_boundaries) ... ok\ntest_non_integer_products (test_module.Contract.test_non_integer_products) ... ok\ntest_product (test_module.Contract.test_product) ... ok\ntest_unsupported_operands_still_raise (test_module.Contract.test_unsupported_operands_still_raise) ... ok\n\n----------------------------------------------------------------------\nRan 4 tests in 0.000s\n\nOK\n",
+        "hidden-contract.txt": "independent product contract passed\n",
+        "independent-mutation-check.txt": "test_integer_boundaries (test_module.Contract.test_integer_boundaries) ... \n  test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=0, b=5) ... FAIL\n  test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=5, b=0) ... FAIL\n  test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=1, b=7) ... FAIL\n  test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=7, b=1) ... FAIL\n  test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=-2, b=3) ... FAIL\n  test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=2, b=-3) ... FAIL\n  test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=-2, b=-3) ... FAIL\n  test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=True, b=3) ... FAIL\n  test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=False, b=3) ... FAIL\n  test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=100000000000000000000, b=3) ... FAIL\ntest_non_integer_products (test_module.Contract.test_non_integer_products) ... \n  test_non_integer_products (test_module.Contract.test_non_integer_products) (a=0.25, b=4) ... FAIL\n  test_non_integer_products (test_module.Contract.test_non_integer_products) (a=-1.5, b=2) ... FAIL\n  test_non_integer_products (test_module.Contract.test_non_integer_products) (a=(1+2j), b=3) ... FAIL\n  test_non_integer_products (test_module.Contract.test_non_integer_products) (a=Decimal('1.2'), b=Decimal('3')) ... FAIL\n  test_non_integer_products (test_module.Contract.test_non_integer_products) (a=Fraction(2, 3), b=Fraction(3, 4)) ... FAIL\ntest_product (test_module.Contract.test_product) ... FAIL\ntest_unsupported_operands_still_raise (test_module.Contract.test_unsupported_operands_still_raise) ... ok\n\n======================================================================\nFAIL: test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=0, b=5)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpw7epnm76/mutant/test_module.py\", line 26, in test_integer_boundaries\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 1 != 0\n\n======================================================================\nFAIL: test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=5, b=0)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpw7epnm76/mutant/test_module.py\", line 26, in test_integer_boundaries\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 1 != 0\n\n======================================================================\nFAIL: test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=1, b=7)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpw7epnm76/mutant/test_module.py\", line 26, in test_integer_boundaries\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 8 != 7\n\n======================================================================\nFAIL: test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=7, b=1)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpw7epnm76/mutant/test_module.py\", line 26, in test_integer_boundaries\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 8 != 7\n\n======================================================================\nFAIL: test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=-2, b=3)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpw7epnm76/mutant/test_module.py\", line 26, in test_integer_boundaries\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: -5 != -6\n\n======================================================================\nFAIL: test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=2, b=-3)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpw7epnm76/mutant/test_module.py\", line 26, in test_integer_boundaries\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: -5 != -6\n\n======================================================================\nFAIL: test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=-2, b=-3)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpw7epnm76/mutant/test_module.py\", line 26, in test_integer_boundaries\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 7 != 6\n\n======================================================================\nFAIL: test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=True, b=3)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpw7epnm76/mutant/test_module.py\", line 26, in test_integer_boundaries\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 4 != 3\n\n======================================================================\nFAIL: test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=False, b=3)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpw7epnm76/mutant/test_module.py\", line 26, in test_integer_boundaries\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 1 != 0\n\n======================================================================\nFAIL: test_integer_boundaries (test_module.Contract.test_integer_boundaries) (a=100000000000000000000, b=3)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpw7epnm76/mutant/test_module.py\", line 26, in test_integer_boundaries\n    self.assertEqual(multiply(a, b), expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 300000000000000000001 != 300000000000000000000\n\n======================================================================\nFAIL: test_non_integer_products (test_module.Contract.test_non_integer_products) (a=0.25, b=4)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpw7epnm76/mutant/test_module.py\", line 39, in test_non_integer_products\n    self.assertEqual(result, expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\nAssertionError: 2.0 != 1.0\n\n======================================================================\nFAIL: test_non_integer_products (test_module.Contract.test_non_integer_products) (a=-1.5, b=2)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpw7epnm76/mutant/test_module.py\", line 39, in test_non_integer_products\n    self.assertEqual(result, expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\nAssertionError: -2.0 != -3.0\n\n======================================================================\nFAIL: test_non_integer_products (test_module.Contract.test_non_integer_products) (a=(1+2j), b=3)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpw7epnm76/mutant/test_module.py\", line 39, in test_non_integer_products\n    self.assertEqual(result, expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\nAssertionError: (4+6j) != (3+6j)\n\n======================================================================\nFAIL: test_non_integer_products (test_module.Contract.test_non_integer_products) (a=Decimal('1.2'), b=Decimal('3'))\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpw7epnm76/mutant/test_module.py\", line 39, in test_non_integer_products\n    self.assertEqual(result, expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\nAssertionError: Decimal('4.6') != Decimal('3.6')\n\n======================================================================\nFAIL: test_non_integer_products (test_module.Contract.test_non_integer_products) (a=Fraction(2, 3), b=Fraction(3, 4))\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpw7epnm76/mutant/test_module.py\", line 39, in test_non_integer_products\n    self.assertEqual(result, expected)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^\nAssertionError: Fraction(3, 2) != Fraction(1, 2)\n\n======================================================================\nFAIL: test_product (test_module.Contract.test_product)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/private/var/folders/6b/s50357ts09j64_wcl62473cw0000gn/T/tmpw7epnm76/mutant/test_module.py\", line 9, in test_product\n    self.assertEqual(multiply(2, 3), 6)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^\nAssertionError: 7 != 6\n\n----------------------------------------------------------------------\nRan 4 tests in 0.002s\n\nFAILED (failures=16)\n"
+      },
+      "outputs": {
+        "calc.py": "def multiply(a, b):\n    return a * b\n",
+        "test_module.py": "import unittest\nfrom decimal import Decimal\nfrom fractions import Fraction\nfrom calc import multiply\n\n\nclass Contract(unittest.TestCase):\n    def test_product(self):\n        self.assertEqual(multiply(2, 3), 6)\n\n    def test_integer_boundaries(self):\n        cases = (\n            (0, 5, 0),\n            (5, 0, 0),\n            (1, 7, 7),\n            (7, 1, 7),\n            (-2, 3, -6),\n            (2, -3, -6),\n            (-2, -3, 6),\n            (True, 3, 3),\n            (False, 3, 0),\n            (100000000000000000000, 3, 300000000000000000000),\n        )\n        for a, b, expected in cases:\n            with self.subTest(a=a, b=b):\n                self.assertEqual(multiply(a, b), expected)\n\n    def test_non_integer_products(self):\n        cases = (\n            (0.25, 4, 1.0),\n            (-1.5, 2, -3.0),\n            (1 + 2j, 3, 3 + 6j),\n            (Decimal(\"1.2\"), Decimal(\"3\"), Decimal(\"3.6\")),\n            (Fraction(2, 3), Fraction(3, 4), Fraction(1, 2)),\n        )\n        for a, b, expected in cases:\n            with self.subTest(a=a, b=b):\n                result = multiply(a, b)\n                self.assertEqual(result, expected)\n                self.assertIs(type(result), type(expected))\n\n    def test_unsupported_operands_still_raise(self):\n        for a, b in ((None, 2), ({}, 2), (\"a\", \"b\")):\n            with self.subTest(a=a, b=b):\n                with self.assertRaises(TypeError):\n                    multiply(a, b)\n",
+        "report.md": "# Multiplication contract repair\n\n## Scope and decision\n\nReviewed the two supplied fixture files, `calc.py` and `test_module.py`, after reading the assigned baseline skill and its agent-workflow and evidence-baseline references. All edits and execution were confined to this outputs directory. No runner, repository-wide suites, builds, lint, formatting, commits, or external repository changes were used.\n\nThe requested multiplication contract means returning the product of the operands. The original implementation returned `a * b + 1`. The existing test compared `multiply(2, 3)` with another call to the same implementation, so its passing result did not establish multiplication correctness. A deterministic wrong answer passes that assertion.\n\nObjective: remove only the extra addition and establish an independent regression oracle before changing production code. Retain the public `multiply(a, b)` signature and native multiplication, with no added coercion, validation, dependencies, or abstractions.\n\n## Changes\n\n- `calc.py`: replaced `return a * b + 1` with `return a * b`.\n- `test_module.py`: replaced the self-comparison with the independently known result `6`; added explicit expected products for zero, identity, signs, booleans, large integers, exact binary floats, complex values, Decimal, and Fraction. Non-integer cases also assert result types. Added three unsupported-operand cases asserting `TypeError`.\n\nExpected values are literals or standard-library numeric constructors, not values obtained from `multiply` or a mirrored multiplication calculation. The tests exercise the real public function without mocks.\n\nIntentional behavior change: numeric results no longer contain an erroneous additive offset (for example, `multiply(2, 3)` changes from `7` to `6`, and multiplication by zero from `1` to `0`). Removing the post-product addition also means valid native multiplication results are no longer required to support adding integer `1`; no artificial numeric-only restriction was introduced. Native `*` behavior and its errors remain delegated to Python.\n\n## Actual commands and outcomes\n\nEvery invocation ran from this outputs directory with the exact command:\n\n```sh\npython3 -B -m unittest -v test_module\n```\n\n| State | Exit code | Observed outcome |\n| --- | --- | --- |\n| Original implementation and original test | 0 | `Ran 1 test`, `OK`; the self-comparison passed despite the defect. |\n| Independent tests added, production still unchanged | 1 | `Ran 4 tests`, `FAILED (failures=16)`; the known product failed with `AssertionError: 7 != 6`, and all 15 numeric boundary subcases failed. The unsupported-operand test passed. |\n| Independent tests after correction | 0 | `Ran 4 tests`, `OK`; all numeric subcases and the three error subcases passed. |\n\nThe pre-fix failing run establishes oracle sensitivity to the actual defect; the final run establishes its correction for the exercised cases. The unsupported-operand checks passed both before and after the production correction, demonstrating preservation of those unaffected errors.\n\n## Recovery and limitations\n\nThe complete original production recovery point is:\n\n```python\ndef multiply(a, b):\n    return a * b + 1\n```\n\nThe complete original test was:\n\n```python\nimport unittest\nfrom calc import multiply\nclass Contract(unittest.TestCase):\n    def test_product(self):\n        self.assertEqual(multiply(2, 3), multiply(2, 3))\n```\n\nNo rollback was needed. The only pre-existing correctness failure was exposed by the independent oracle; the original check did not report it. Verification covers this small fixture, not all Python numeric values, custom operator overloads, or downstream consumers. No broader behavioral-equivalence or benchmark claim is made. There are no unresolved findings in the reviewed multiplication and verification paths.\n"
+      }
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+name: Trusted SARIF interchange
+
+on:
+  workflow_dispatch:
+    inputs:
+      capture:
+        description: Committed SARIF capture, mutually exclusive with run_spec
+        required: false
+        default: ''
+        type: string
+      run_spec:
+        description: Committed diagnosis spec to execute in the bounded Linux container
+        required: false
+        default: ''
+        type: string
+      check:
+        description: Check ID whose stdout is SARIF, required with run_spec
+        required: false
+        default: ''
+        type: string
+      tool:
+        description: Exact tool name to export separately
+        required: true
+        type: string
+      category:
+        description: Unique tool/configuration category for this upload
+        required: true
+        type: string
+      upload:
+        description: Upload to code scanning (requires repository feature availability)
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  normalize:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Build the Linux runtime for a requested diagnosis
+        if: inputs.run_spec != ''
+        run: docker build -t anti-slop-runtime:local .
+      - name: Run bounded diagnosis or normalize a committed capture
+        env:
+          CAPTURE: ${{ inputs.capture }}
+          TOOL: ${{ inputs.tool }}
+          RUN_SPEC: ${{ inputs.run_spec }}
+          CHECK: ${{ inputs.check }}
+          PYTHONDONTWRITEBYTECODE: "1"
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import shutil
+          import sys
+          import subprocess
+          from pathlib import Path
+          root = Path(os.environ['GITHUB_WORKSPACE']).resolve()
+          sys.path.insert(0, str(root / 'scripts'))
+          from anti_slop_core.schema import load_run_spec
+          temporary = Path(os.environ['RUNNER_TEMP'])
+          sarif = temporary / 'tool.sarif'
+          def tracked_file(value):
+              relative = Path(value)
+              if not value or relative.is_absolute() or '..' in relative.parts:
+                  raise SystemExit('input must be a safe repository-relative file')
+              path = root / relative
+              if path.is_symlink():
+                  raise SystemExit('input must not be a symlink')
+              path = path.resolve()
+              path.relative_to(root)
+              subprocess.run(['git', '-C', str(root), 'ls-files', '--error-unmatch', '--', str(relative)], check=True, capture_output=True)
+              if not path.is_file():
+                  raise SystemExit('input does not exist')
+              return path
+          capture_name, spec_name = os.environ['CAPTURE'], os.environ['RUN_SPEC']
+          if bool(capture_name) == bool(spec_name):
+              raise SystemExit('provide exactly one of capture or run_spec')
+          if spec_name:
+              if not os.environ['CHECK']:
+                  raise SystemExit('run_spec requires a SARIF check ID')
+              raw_spec = tracked_file(spec_name).read_bytes()
+              load_run_spec(raw_spec)
+              spec = json.loads(raw_spec)
+              if spec.get('mode') != 'diagnose':
+                  raise SystemExit('CI source execution supports diagnosis only')
+              original_snapshot = Path(spec['snapshot_root']).resolve()
+              for check in spec['checks']:
+                  cwd = Path(check.get('cwd', '.'))
+                  if cwd.is_absolute():
+                      check['cwd'] = cwd.resolve().relative_to(original_snapshot).as_posix()
+              spec['repo_path'] = str(root)
+              spec['snapshot_root'] = str(temporary / 'ci-snapshot/workspace')
+              task_spec = temporary / 'diagnosis.json'
+              task_spec.write_text(json.dumps(spec))
+              evidence = temporary / 'diagnosis-evidence'
+              result = subprocess.run(['python3', 'scripts/container.py', 'run', '--spec', str(task_spec),
+                                       '--snapshot', str(temporary / 'ci-snapshot'), '--evidence', str(evidence),
+                                       '--sarif-check', os.environ['CHECK'], '--sarif-tool', os.environ['TOOL']],
+                                      capture_output=True, text=True)
+              if result.returncode not in (0, 1):
+                  raise SystemExit(result.stderr)
+              output = json.loads(result.stdout)
+              emitted = evidence / Path(output['sarif']).relative_to('/evidence')
+              shutil.copyfile(emitted, sarif)
+          else:
+              signals = temporary / 'tool-signals.json'
+              subprocess.run(['python3', 'scripts/run.py', 'import-sarif', '--sarif', str(tracked_file(capture_name)),
+                              '--repo', str(root), '--output', str(signals)], check=True)
+              subprocess.run(['python3', 'scripts/run.py', 'export-sarif', '--signals', str(signals),
+                              '--tool', os.environ['TOOL'], '--output', str(sarif)], check=True)
+          if len(json.loads(sarif.read_text())['runs']) != 1:
+              raise SystemExit('choose one version of the named tool per upload/category')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: normalized-sarif
+          path: ${{ runner.temp }}/tool.sarif
+          if-no-files-found: error
+          retention-days: 7
+
+  upload:
+    needs: normalize
+    if: inputs.upload && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      security-events: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: normalized-sarif
+          path: sarif-artifact
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: sarif-artifact/tool.sarif
+          category: ${{ inputs.category }}

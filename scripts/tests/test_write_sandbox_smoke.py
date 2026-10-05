@@ -28,13 +28,12 @@ class RealWriteSmokeTests(unittest.TestCase):
             probe = Sandbox(probe_workspace).run(["/bin/true"], timeout=5)
         except SandboxUnavailable as exc:
             self.skipTest(f"real Bubblewrap unavailable: {exc}")
-        if probe.returncode != 0:
-            self.skipTest(f"real Bubblewrap probe failed (exit {probe.returncode}): {probe.stderr.decode(errors='replace').strip()}")
+        self.assertEqual(probe.returncode, 0, probe.stderr.decode(errors="replace"))
         self.source = self.root / "source"
         commit_fixture(self.source, {"calc.py": ORIGINAL, "contract.py": CONTRACT})
         self.before = tree_identity(self.source)
 
-    def run_cli(self, mode="refactor", steps=None):
+    def run_cli(self, mode="refactor", steps=None, **overrides):
         payload = {
             "repo_path": str(self.source), "snapshot_root": str(self.root / "snapshot"), "mode": mode,
             "checks": [{"id": "contract", "argv": ["/usr/bin/python3", "-B", "contract.py"]}],
@@ -43,6 +42,7 @@ class RealWriteSmokeTests(unittest.TestCase):
             "limits": {"max_files": 1, "max_changed_lines": 30, "max_steps": 2},
             "steps": steps if steps is not None else [step()],
         }
+        payload.update(overrides)
         spec = self.root / "spec.json"
         spec.write_text(json.dumps(payload))
         env = dict(os.environ, HERMES_HOME=str(self.root / "evidence"))
@@ -72,6 +72,26 @@ class RealWriteSmokeTests(unittest.TestCase):
         self.assertFalse((store.root / "write/final.patch").exists())
         audit = json.loads((store.root / "write/evidence.json").read_text())
         self.assertEqual([record["status"] for record in audit["steps"]], ["passed", "rolled_back"])
+
+    def test_mounted_absolute_verifier_cannot_be_weakened_with_production(self):
+        verifier = CONTRACT.replace("from calc import price\n", "from calc import price\nfrom oracle_values import EXPECTED_TOTAL\n")
+        verifier = verifier.replace("price(3, 4) == 12", "price(3, 4) == EXPECTED_TOTAL")
+        (self.source / "contract.py").write_text(verifier)
+        (self.source / "oracle_values.py").write_text("EXPECTED_TOTAL = 12\n")
+        subprocess.run(["git", "-C", str(self.source), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(self.source), "commit", "-qm", "Independent oracle value"], check=True)
+        self.before = tree_identity(self.source)
+        result, manifest, store = self.run_cli(
+            steps=[step("weaken-mounted-verifier", [change(after=REGRESSION),
+                        change("contract.py", verifier, "print('passed')\n")])],
+            checks=[{"id": "contract", "argv": ["/usr/bin/python3", "-B", "/workspace/contract.py"]}],
+            allowed_paths=["calc.py", "contract.py"], oracle_paths=["oracle_values.py"],
+            limits={"max_files": 2, "max_changed_lines": 30, "max_steps": 1})
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertNotEqual(manifest.status, ManifestStatus.PASSED)
+        self.assertEqual((self.root / "snapshot/contract.py").read_text(), verifier)
+        self.assertEqual((self.root / "snapshot/calc.py").read_text(), ORIGINAL)
+        self.assertFalse((store.root / "write/final.patch").exists())
 
 
 if __name__ == "__main__":

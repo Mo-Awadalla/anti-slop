@@ -1,3 +1,5 @@
+import shutil
+import sys
 import subprocess
 import tempfile
 import unittest
@@ -24,6 +26,9 @@ def spec(source: Path, snapshot: Path, *checks: CheckSpec) -> RunSpec:
 
 class DiagnoseAcceptanceTests(unittest.TestCase):
     def setUp(self):
+        for executable in ("true", "false"):
+            if shutil.which(executable, path="/usr/bin:/bin") is None:
+                self.skipTest(f"trusted fixture executable unavailable: {executable}")
         runner = patch("anti_slop_core.diagnose.BubblewrapSandbox", LocalFixtureSandbox)
         runner.start()
         self.addCleanup(runner.stop)
@@ -35,7 +40,7 @@ class DiagnoseAcceptanceTests(unittest.TestCase):
             source.mkdir()
             make_repo(source)
             manifest, _, _ = run_diagnose(
-                spec(source, root / "snapshot", CheckSpec("red", ("/bin/false",))),
+                spec(source, root / "snapshot", CheckSpec("red", (shutil.which("false", path="/usr/bin:/bin"),))),
                 hermes_home=str(root / "hermes"),
             )
             self.assertEqual(manifest.checks[0].status, CheckStatus.FAILED)
@@ -62,7 +67,7 @@ class DiagnoseAcceptanceTests(unittest.TestCase):
             make_repo(source)
             manifest, _, _ = run_diagnose(
                 spec(source, root / "snapshot", CheckSpec(
-                    "flaky", ("/usr/bin/python3", "-c", "from pathlib import Path; p=Path('.marker'); exists=p.exists(); p.touch(); raise SystemExit(int(exists))"), rerun=True,
+                    "flaky", (sys.executable, "-c", "from pathlib import Path; p=Path('.marker'); exists=p.exists(); p.touch(); raise SystemExit(int(exists))"), rerun=True,
                 )),
                 hermes_home=str(root / "hermes"),
             )
@@ -78,7 +83,7 @@ class DiagnoseAcceptanceTests(unittest.TestCase):
             (source / "README.md").write_text("dirty\n", encoding="utf-8")
             before = (source / "README.md").read_text(encoding="utf-8")
             manifest, _, _ = run_diagnose(
-                spec(source, root / "snapshot", CheckSpec("unit", ("/bin/true",))),
+                spec(source, root / "snapshot", CheckSpec("unit", (shutil.which("true", path="/usr/bin:/bin"),))),
                 hermes_home=str(root / "hermes"),
             )
             self.assertEqual(manifest.status, ManifestStatus.STOPPED)
@@ -93,7 +98,7 @@ class DiagnoseAcceptanceTests(unittest.TestCase):
             make_repo(source)
             before = tree_identity(source)
             manifest, _, report_path = run_diagnose(
-                spec(source, root / "snapshot", CheckSpec("unit", ("/bin/true",))),
+                spec(source, root / "snapshot", CheckSpec("unit", (shutil.which("true", path="/usr/bin:/bin"),))),
                 hermes_home=str(root / "hermes"),
             )
             self.assertEqual(manifest.status, ManifestStatus.PASSED)
@@ -109,7 +114,7 @@ class DiagnoseAcceptanceTests(unittest.TestCase):
             make_repo(source)
             with patch("anti_slop_core.diagnose.BubblewrapSandbox", side_effect=SandboxUnavailable("fixture unavailable")):
                 manifest, _, _ = run_diagnose(
-                    spec(source, root / "snapshot", CheckSpec("unit", ("/bin/true",))),
+                    spec(source, root / "snapshot", CheckSpec("unit", (shutil.which("true", path="/usr/bin:/bin"),))),
                     hermes_home=str(root / "hermes"),
                 )
             self.assertEqual(manifest.status, ManifestStatus.BLOCKED)
