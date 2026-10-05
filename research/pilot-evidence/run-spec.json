@@ -1,0 +1,34 @@
+{
+  "mode": "diagnose",
+  "repo_path": "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/pilot-source",
+  "snapshot_root": "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/pilot-snapshot-v2",
+  "checks": [
+    {
+      "id": "core-suite",
+      "cwd": "scripts",
+      "argv": [
+        "python3",
+        "-m",
+        "unittest",
+        "tests.test_schema",
+        "tests.test_artifacts_manifest",
+        "tests.test_findings_report_checkpoint",
+        "tests.test_cli",
+        "-v"
+      ],
+      "timeout_seconds": 60,
+      "required": true
+    },
+    {
+      "id": "trust-repro",
+      "cwd": "scripts",
+      "argv": [
+        "python3",
+        "-c",
+        "exec(\"import json,tempfile\\nfrom anti_slop_core.artifacts import ArtifactStore\\nfrom anti_slop_core.manifest import derive_check_status\\nfrom anti_slop_core.findings import is_no_edit_correct\\nfrom anti_slop_core.models import *\\nwith tempfile.TemporaryDirectory() as home:\\n s=ArtifactStore('proof',home)\\n s.create()\\n out=s.put_bytes('out',b'')\\n err=s.put_bytes('err',b'')\\n a=CommandAttempt('unit',('/bin/true',),'.',AttemptStatus.PASSED,0,1,out,err,False)\\n c=CheckRecord('unit',CheckStatus.PASSED,(a,))\\n m=RunManifest('proof',RunMode.DIAGNOSE,'/repo','/snapshot',ManifestStatus.PASSED,(),(),())\\n print(json.dumps({'unsandboxed_pass':derive_check_status(c).value,'missing_hash_accepted':s.verify(ArtifactRef('out')),'asserted_no_edit':is_no_edit_correct(m,())},sort_keys=True))\")"
+      ],
+      "timeout_seconds": 20,
+      "required": true
+    }
+  ]
+}

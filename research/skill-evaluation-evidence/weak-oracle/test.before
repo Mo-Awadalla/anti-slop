@@ -1,0 +1,5 @@
+import unittest
+from module import multiply
+class MultiplyTests(unittest.TestCase):
+    def test_generated(self): self.assertEqual(multiply(2, 3), multiply(2, 3))
+if __name__ == "__main__": unittest.main()

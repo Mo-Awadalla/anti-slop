@@ -1,0 +1,41 @@
+{
+  "clean": {
+    "before_sha256": "57f261c88e8f56330831c6f95c45f987e5d959c92815f9d8a55c3c2e038e6a78",
+    "baseline_exit": 0,
+    "after_sha256": "57f261c88e8f56330831c6f95c45f987e5d959c92815f9d8a55c3c2e038e6a78",
+    "source_unchanged": true
+  },
+  "prevention": {
+    "before_sha256": "3b8b2d110a290e9f97de6c565445aa540be451542ebad7c91e01bebed3d477ea",
+    "baseline_exit": 0,
+    "verified_exit": 0,
+    "after_sha256": "434bd3c740094d7a9f1d8aed2f74d082edf2d67658e26bb44e6a5da06bc10442",
+    "source_unchanged": false
+  },
+  "repair": {
+    "before_sha256": "67d5b87d15f72f261209824cce9cae7a478ac08df863395ac5b1737c32f44285",
+    "baseline_exit": 1,
+    "verified_exit": 0,
+    "after_sha256": "b28dccead6a97ed38c8680cbdeb26594cb0b4d8e5f906582d099d2a8f065fea0",
+    "source_unchanged": false
+  },
+  "weak-oracle": {
+    "before_sha256": "5fe1a10631a0f2914439bc223d79067b4730436bdf9be9709736d6910744b8d5",
+    "baseline_exit": 0,
+    "independent-oracle_exit": 1,
+    "verified_exit": 0,
+    "mutation_exit": 1,
+    "restored_exit": 0,
+    "after_sha256": "12141ca5171ea43624b961e04b6ef0e709db4d1b90d1c967bea2706afe4aad27",
+    "source_unchanged": false
+  },
+  "unavailable": {
+    "status": "blocked",
+    "check_status": "unavailable",
+    "source_unchanged": true,
+    "host_fallback_executed": false,
+    "snapshot_check_executed": false,
+    "manifest": "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/anti-slop-skill-evaluation/unavailable/artifacts/cache/anti-slop/runs/skill-evaluation-unavailable/manifest.json",
+    "report": "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/anti-slop-skill-evaluation/unavailable/artifacts/cache/anti-slop/runs/skill-evaluation-unavailable/report.md"
+  }
+}

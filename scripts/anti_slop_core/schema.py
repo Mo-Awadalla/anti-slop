@@ -1,4 +1,4 @@
-"""Strict standard-library JSON validation for all public P0 contracts."""
+"""Strict standard-library JSON validation for all public contracts."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from typing import Any, Iterable, Optional, Set, Type, TypeVar
 from .models import (
     ArtifactRef, AttemptStatus, CheckRecord, CheckSpec, CheckStatus,
     CommandAttempt, DiscoveryInfo, Finding, FindingSeverity, ManifestStatus,
-    RunManifest, RunMode, RunSpec,
+    DiffLimits, PatchChange, PatchStep, RunManifest, RunMode, RunSpec,
 )
 
 
@@ -31,6 +31,15 @@ def _json_constant(value: str) -> Any:
     raise SchemaError(f"invalid JSON constant: {value}")
 
 
+def _json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise SchemaError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
 def _object(value: Any, path: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping) or not all(isinstance(k, str) for k in value):
         raise SchemaError(f"{path} must be an object with string keys")
@@ -40,7 +49,7 @@ def _object(value: Any, path: str) -> Mapping[str, Any]:
 def _decode(value: Any, path: str) -> Any:
     if isinstance(value, (str, bytes, bytearray)):
         try:
-            return json.loads(value, parse_constant=_json_constant)
+            return json.loads(value, parse_constant=_json_constant, object_pairs_hook=_json_object)
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise SchemaError(f"{path} is not valid JSON: {exc}") from exc
     return value
@@ -104,7 +113,7 @@ def _enum(value: Any, enum_type: Type[Enum], path: str) -> Any:
 
 def _absolute_path(value: Any, path: str) -> str:
     result = _string(value, path)
-    if not os.path.isabs(result):
+    if '\0' in result or not os.path.isabs(result):
         raise SchemaError(f"{path} must be an absolute path")
     return os.path.normpath(result)
 
@@ -116,6 +125,8 @@ def _argv(value: Any, path: str) -> tuple[str, ...]:
     result = []
     for index, item in enumerate(values):
         arg = _string(item, f"{path}[{index}]")
+        if '\0' in arg:
+            raise SchemaError(f"{path}[{index}] contains a NUL byte")
         if _SHELL_META.search(arg):
             raise SchemaError(f"{path}[{index}] contains shell syntax")
         result.append(arg)
@@ -141,7 +152,7 @@ def _cwd(value: Any, snapshot_root: str, path: str) -> str:
 
 def _artifact_path(value: Any, path: str) -> str:
     result = _string(value, path)
-    if os.path.isabs(result) or "\\" in result:
+    if os.path.isabs(result) or "\\" in result or any(ord(character) < 32 or ord(character) == 127 for character in result):
         raise SchemaError(f"{path} must be a relative POSIX path")
     parts = result.split("/")
     if any(part in ("", ".", "..") for part in parts):
@@ -156,7 +167,7 @@ def _check_spec(value: Any, snapshot_root: str, path: str) -> CheckSpec:
     timeout = None if obj.get("timeout_seconds") is None else _number(obj["timeout_seconds"], f"{path}.timeout_seconds", minimum=0)
     shell = _bool(obj.get("shell", False), f"{path}.shell")
     if shell:
-        raise SchemaError(f"{path}.shell must be false in P0")
+        raise SchemaError(f"{path}.shell must be false")
     return CheckSpec(
         _string(obj["id"], f"{path}.id"), _argv(obj["argv"], f"{path}.argv"),
         _cwd(obj.get("cwd", "."), snapshot_root, f"{path}.cwd"), shell, timeout,
@@ -164,16 +175,64 @@ def _check_spec(value: Any, snapshot_root: str, path: str) -> CheckSpec:
     )
 
 
-def _diagnose_mode(value: Any, path: str) -> RunMode:
-    mode = _enum(value, RunMode, path)
-    if mode is not RunMode.DIAGNOSE:
-        raise SchemaError(f"{path} must be 'diagnose' in P0")
-    return mode
+def _path_list(value: Any, path: str, *, nonempty: bool = True) -> tuple[str, ...]:
+    from .diff_budget import DiffGuardError, protected_path, safe_relative_path
+    result = tuple(_artifact_path(item, f"{path}[{i}]") for i, item in enumerate(_list(value, path)))
+    for item in result:
+        try:
+            safe_relative_path(item)
+        except DiffGuardError as exc:
+            raise SchemaError(f"{path}: {exc}") from exc
+        if '.git' in item.split('/'):
+            raise SchemaError(f"{path} cannot refer to Git metadata")
+        if path == 'run_spec.allowed_paths' and protected_path(item):
+            raise SchemaError(f"{path} contains a protected configuration/verification surface: {item}")
+    if nonempty and not result:
+        raise SchemaError(f"{path} must not be empty")
+    if len(set(result)) != len(result):
+        raise SchemaError(f"{path} contains duplicate paths")
+    return result
+
+
+def _patch_step(value: Any, path: str) -> PatchStep:
+    obj = _object(value, path)
+    _keys(obj, {"id", "description", "changes"}, path)
+    _required(obj, {"id", "description", "changes"}, path)
+    changes = []
+    for index, value in enumerate(_list(obj["changes"], f"{path}.changes")):
+        location = f"{path}.changes[{index}]"
+        change = _object(value, location)
+        _keys(change, {"path", "before_sha256", "content"}, location)
+        _required(change, {"path", "before_sha256", "content"}, location)
+        before = change["before_sha256"]
+        if before is not None:
+            before = _string(before, f"{location}.before_sha256")
+            if not _SHA256.fullmatch(before):
+                raise SchemaError(f"{location}.before_sha256 must be a lower-case SHA-256 digest")
+        content = change["content"]
+        if content is not None:
+            content = _string(content, f"{location}.content", nonempty=False)
+            if "\0" in content:
+                raise SchemaError(f"{location}.content must be text without NUL bytes")
+            try:
+                content.encode("utf-8")
+            except UnicodeEncodeError as exc:
+                raise SchemaError(f"{location}.content must be valid UTF-8 text") from exc
+        if before is None and content is None:
+            raise SchemaError(f"{location} cannot delete a nonexistent file")
+        changes.append(PatchChange(_artifact_path(change["path"], f"{location}.path"), before, content))
+    if not changes:
+        raise SchemaError(f"{path}.changes must not be empty")
+    if len({change.path for change in changes}) != len(changes):
+        raise SchemaError(f"{path}.changes contains duplicate paths")
+    return PatchStep(_string(obj["id"], f"{path}.id"), _string(obj["description"], f"{path}.description"), tuple(changes))
 
 
 def load_run_spec(value: Any) -> RunSpec:
     obj = _object(_decode(value, "run_spec"), "run_spec")
-    _keys(obj, {"repo_path", "snapshot_root", "mode", "checks"}, "run_spec")
+    base = {"repo_path", "snapshot_root", "mode", "checks"}
+    write = {"objective", "behavior_budget", "allowed_paths", "oracle_checks", "oracle_paths", "protected_paths", "limits", "steps"}
+    _keys(obj, base | write, "run_spec")
     _required(obj, {"repo_path", "snapshot_root", "mode", "checks"}, "run_spec")
     repo_path = _absolute_path(obj["repo_path"], "run_spec.repo_path")
     snapshot_root = _absolute_path(obj["snapshot_root"], "run_spec.snapshot_root")
@@ -181,7 +240,40 @@ def load_run_spec(value: Any) -> RunSpec:
     ids = [c.id for c in checks]
     if len(ids) != len(set(ids)):
         raise SchemaError("run_spec.checks contains duplicate check IDs")
-    return RunSpec(repo_path, snapshot_root, _diagnose_mode(obj["mode"], "run_spec.mode"), checks)
+    mode = _enum(obj["mode"], RunMode, "run_spec.mode")
+    if mode is RunMode.DIAGNOSE:
+        if set(obj) & write:
+            raise SchemaError("diagnose does not accept write-mode fields")
+        return RunSpec(repo_path, snapshot_root, mode, checks)
+    _required(obj, write - {"protected_paths"}, "run_spec")
+    objective = _string(obj["objective"], "run_spec.objective")
+    if not objective.strip():
+        raise SchemaError("run_spec.objective must describe the intended change")
+    if obj["behavior_budget"] != "preserve":
+        raise SchemaError("write modes support only behavior_budget 'preserve'")
+    allowed = _path_list(obj["allowed_paths"], "run_spec.allowed_paths")
+    oracle_paths = _path_list(obj["oracle_paths"], "run_spec.oracle_paths")
+    protected = _path_list(obj.get("protected_paths", []), "run_spec.protected_paths", nonempty=False)
+    oracles = tuple(_string(item, "run_spec.oracle_checks[]") for item in _list(obj["oracle_checks"], "run_spec.oracle_checks"))
+    if not oracles or len(set(oracles)) != len(oracles):
+        raise SchemaError("run_spec.oracle_checks must contain distinct check IDs")
+    required_checks = {check.id for check in checks if check.required}
+    if not set(oracles) <= required_checks:
+        raise SchemaError("run_spec.oracle_checks must name explicitly required checks")
+    limits_obj = _object(obj["limits"], "run_spec.limits")
+    _keys(limits_obj, {"max_files", "max_changed_lines", "max_steps"}, "run_spec.limits")
+    _required(limits_obj, {"max_files", "max_changed_lines", "max_steps"}, "run_spec.limits")
+    limits = DiffLimits(*(_integer(limits_obj[key], f"run_spec.limits.{key}", minimum=1) for key in ("max_files", "max_changed_lines", "max_steps")))
+    steps = tuple(_patch_step(item, f"run_spec.steps[{i}]") for i, item in enumerate(_list(obj["steps"], "run_spec.steps")))
+    if len(steps) > limits.max_steps:
+        raise SchemaError("run_spec.steps exceeds max_steps")
+    if len({step.id for step in steps}) != len(steps):
+        raise SchemaError("run_spec.steps contains duplicate IDs")
+    if set(allowed) & (set(oracle_paths) | set(protected)):
+        raise SchemaError("allowed_paths overlaps protected oracle or declared protected paths")
+    if any(change.path not in allowed for step in steps for change in step.changes):
+        raise SchemaError("step changes must be explicitly listed in allowed_paths")
+    return RunSpec(repo_path, snapshot_root, mode, checks, objective, "preserve", allowed, oracles, oracle_paths, protected, limits, steps)
 
 
 def _artifact(value: Any, path: str) -> ArtifactRef:
@@ -233,22 +325,7 @@ def _check_record(value: Any, snapshot_root: str, path: str) -> CheckRecord:
 
 
 def _finding(value: Any, path: str) -> Finding:
-    obj = dict(_object(value, path))
-    # Accept the pre-contract fixture shape used by the original Task 2 tests,
-    # then normalize it into the strict P0 finding representation.
-    if "check_id" in obj or "message" in obj:
-        obj = {
-            "id": obj.get("id", "finding"),
-            "title": obj.get("message", obj.get("title", "unspecified finding")),
-            "source": obj.get("check_id", obj.get("source", "unknown")),
-            "evidence_refs": obj.get("evidence", obj.get("evidence_refs", [])),
-            "severity": obj.get("severity", "low"),
-            "impact": obj.get("impact", "unspecified"),
-            "confidence": obj.get("confidence", 0.0),
-            "recommended_action": obj.get("recommended_action", "review in context"),
-            "counterargument": obj.get("counterargument", "not recorded"),
-            **{key: obj[key] for key in ("path", "line", "column") if key in obj},
-        }
+    obj = _object(value, path)
     allowed = {"id", "title", "source", "evidence_refs", "severity", "impact", "confidence", "recommended_action", "counterargument", "path", "line", "column"}
     _keys(obj, allowed, path)
     _required(obj, {"id", "title", "source", "evidence_refs", "severity", "impact", "confidence", "recommended_action", "counterargument"}, path)
@@ -292,7 +369,14 @@ def load_run_manifest(value: Any) -> RunManifest:
     artifacts = tuple(_artifact(v, f"run_manifest.artifacts[{i}]") for i, v in enumerate(_list(obj.get("artifacts", []), "run_manifest.artifacts")))
     if len({a.path for a in artifacts}) != len(artifacts):
         raise SchemaError("run_manifest.artifacts contains duplicate paths")
-    manifest = RunManifest(_string(obj["run_id"], "run_manifest.run_id"), _diagnose_mode(obj["mode"], "run_manifest.mode"), repo, snapshot, _enum(obj["status"], ManifestStatus, "run_manifest.status"), checks, findings, artifacts, _discovery(obj["discovery"]) if obj.get("discovery") is not None else None, _string(obj["stop_reason"], "run_manifest.stop_reason") if obj.get("stop_reason") is not None else None)
+    manifest = RunManifest(_string(obj["run_id"], "run_manifest.run_id"), _enum(obj["mode"], RunMode, "run_manifest.mode"), repo, snapshot, _enum(obj["status"], ManifestStatus, "run_manifest.status"), checks, findings, artifacts, _discovery(obj["discovery"]) if obj.get("discovery") is not None else None, _string(obj["stop_reason"], "run_manifest.stop_reason") if obj.get("stop_reason") is not None else None)
+    if manifest.mode is not RunMode.DIAGNOSE:
+        by_path = {artifact.path: artifact for artifact in artifacts}
+        required_artifacts = {'write/evidence.json'}
+        if manifest.status is ManifestStatus.PASSED:
+            required_artifacts.add('write/final.patch')
+        if any(path not in by_path or by_path[path].sha256 is None or by_path[path].size_bytes is None for path in required_artifacts):
+            raise SchemaError('write manifests require hashed change evidence and a hashed patch for a pass')
     from .manifest import derive_manifest_status
     derived = derive_manifest_status(manifest.checks, stop_reason=manifest.stop_reason, artifact_paths={a.path for a in artifacts})
     if manifest.status is not derived:

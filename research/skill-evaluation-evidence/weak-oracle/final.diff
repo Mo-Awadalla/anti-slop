@@ -1,0 +1,18 @@
+--- module.before
++++ module.py
+@@ -1,2 +1,2 @@
+ def multiply(a, b):
+-    return a * b + 1
++    return a * b
+--- test.before
++++ test_module.py
+@@ -1,5 +1,8 @@
+ import unittest
+ from module import multiply
+ class MultiplyTests(unittest.TestCase):
+-    def test_generated(self): self.assertEqual(multiply(2, 3), multiply(2, 3))
++    def test_positive(self): self.assertEqual(multiply(2, 3), 6)
++    def test_zero(self): self.assertEqual(multiply(2, 0), 0)
++    def test_negative(self): self.assertEqual(multiply(-2, 3), -6)
++    def test_fraction(self): self.assertEqual(multiply(0.5, 4), 2)
+ if __name__ == "__main__": unittest.main()

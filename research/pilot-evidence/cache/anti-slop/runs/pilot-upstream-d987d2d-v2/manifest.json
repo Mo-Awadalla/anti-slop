@@ -1,0 +1,163 @@
+{
+  "artifacts": [
+    {
+      "media_type": "text/plain",
+      "path": "checks/0dc56990a7268b8b/attempt-1.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "media_type": "text/plain",
+      "path": "checks/0dc56990a7268b8b/attempt-1.stderr",
+      "sha256": "ca801c6471af31326e6ac2e4009e0660356d8cf6d838591734a0e9acd496af14",
+      "size_bytes": 3947
+    },
+    {
+      "media_type": "text/plain",
+      "path": "checks/996978304d49c7bb/attempt-1.stdout",
+      "sha256": "ccb4f03e4a8cd170dfef2f4aa52d8d639c1e35371e8d9de40185f9b7e06698dc",
+      "size_bytes": 88
+    },
+    {
+      "media_type": "text/plain",
+      "path": "checks/996978304d49c7bb/attempt-1.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    }
+  ],
+  "checks": [
+    {
+      "attempts": [
+        {
+          "argv": [
+            "python3",
+            "-m",
+            "unittest",
+            "tests.test_schema",
+            "tests.test_artifacts_manifest",
+            "tests.test_findings_report_checkpoint",
+            "tests.test_cli",
+            "-v"
+          ],
+          "check_id": "core-suite",
+          "cwd": "scripts",
+          "duration_ms": 87.83763999963412,
+          "exit_code": 0,
+          "sandboxed": true,
+          "status": "passed",
+          "stderr_artifact": {
+            "media_type": "text/plain",
+            "path": "checks/0dc56990a7268b8b/attempt-1.stderr",
+            "sha256": "ca801c6471af31326e6ac2e4009e0660356d8cf6d838591734a0e9acd496af14",
+            "size_bytes": 3947
+          },
+          "stdout_artifact": {
+            "media_type": "text/plain",
+            "path": "checks/0dc56990a7268b8b/attempt-1.stdout",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size_bytes": 0
+          }
+        }
+      ],
+      "check_id": "core-suite",
+      "finding_ids": [],
+      "required": true,
+      "status": "passed"
+    },
+    {
+      "attempts": [
+        {
+          "argv": [
+            "python3",
+            "-c",
+            "exec(\"import json,tempfile\\nfrom anti_slop_core.artifacts import ArtifactStore\\nfrom anti_slop_core.manifest import derive_check_status\\nfrom anti_slop_core.findings import is_no_edit_correct\\nfrom anti_slop_core.models import *\\nwith tempfile.TemporaryDirectory() as home:\\n s=ArtifactStore('proof',home)\\n s.create()\\n out=s.put_bytes('out',b'')\\n err=s.put_bytes('err',b'')\\n a=CommandAttempt('unit',('/bin/true',),'.',AttemptStatus.PASSED,0,1,out,err,False)\\n c=CheckRecord('unit',CheckStatus.PASSED,(a,))\\n m=RunManifest('proof',RunMode.DIAGNOSE,'/repo','/snapshot',ManifestStatus.PASSED,(),(),())\\n print(json.dumps({'unsandboxed_pass':derive_check_status(c).value,'missing_hash_accepted':s.verify(ArtifactRef('out')),'asserted_no_edit':is_no_edit_correct(m,())},sort_keys=True))\")"
+          ],
+          "check_id": "trust-repro",
+          "cwd": "scripts",
+          "duration_ms": 46.166469997842796,
+          "exit_code": 0,
+          "sandboxed": true,
+          "status": "passed",
+          "stderr_artifact": {
+            "media_type": "text/plain",
+            "path": "checks/996978304d49c7bb/attempt-1.stderr",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size_bytes": 0
+          },
+          "stdout_artifact": {
+            "media_type": "text/plain",
+            "path": "checks/996978304d49c7bb/attempt-1.stdout",
+            "sha256": "ccb4f03e4a8cd170dfef2f4aa52d8d639c1e35371e8d9de40185f9b7e06698dc",
+            "size_bytes": 88
+          }
+        }
+      ],
+      "check_id": "trust-repro",
+      "finding_ids": [],
+      "required": true,
+      "status": "passed"
+    }
+  ],
+  "discovery": {
+    "branch": "main",
+    "candidates": [
+      "make the",
+      "python3"
+    ],
+    "dirty": false,
+    "git_root": "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/pilot-source",
+    "head": "d987d2d69ec5be5eb3f559266dbc1528b72d1ef5"
+  },
+  "findings": [
+    {
+      "confidence": 1.0,
+      "counterargument": "The original CLI normally constructs sandboxed attempts; the vulnerability matters when importing or constructing manifests.",
+      "evidence_refs": [
+        "checks/996978304d49c7bb/attempt-1.stdout"
+      ],
+      "id": "trust-1",
+      "impact": "A caller can claim sandboxed verification without isolation; the original status derivation ignores the sandboxed flag.",
+      "line": 34,
+      "path": "scripts/anti_slop_core/manifest.py",
+      "recommended_action": "Reject passed attempts with sandboxed=false and verify the regression with a zero-exit unsandboxed attempt.",
+      "severity": "high",
+      "source": "trust-repro",
+      "title": "Unsandboxed zero-exit attempt counts as passed"
+    },
+    {
+      "confidence": 1.0,
+      "counterargument": "Normal capture populates metadata; existing validators admit externally supplied incomplete artifacts.",
+      "evidence_refs": [
+        "checks/996978304d49c7bb/attempt-1.stdout"
+      ],
+      "id": "trust-2",
+      "impact": "A manifest can omit hashes and sizes, so changed output can be treated as verified evidence.",
+      "line": 65,
+      "path": "scripts/anti_slop_core/artifacts.py",
+      "recommended_action": "Require SHA-256 and size metadata for verification and test missing metadata and post-capture tampering.",
+      "severity": "high",
+      "source": "trust-repro",
+      "title": "Artifact verification accepts absent integrity metadata"
+    },
+    {
+      "confidence": 1.0,
+      "counterargument": "Strict JSON loading rejects inconsistent manifest status, reducing exposure through the existing validate-findings CLI.",
+      "evidence_refs": [
+        "checks/996978304d49c7bb/attempt-1.stdout"
+      ],
+      "id": "trust-3",
+      "impact": "Reports can endorse a no-edit decision without recorded required attempts if constructed models bypass the JSON loader.",
+      "line": 43,
+      "path": "scripts/anti_slop_core/findings.py",
+      "recommended_action": "Derive the decision from required attempts and clean discovery, then test an asserted pass with no attempts.",
+      "severity": "medium",
+      "source": "trust-repro",
+      "title": "No-edit decision trusts an asserted pass without checks"
+    }
+  ],
+  "mode": "diagnose",
+  "repo_path": "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/pilot-source",
+  "run_id": "pilot-upstream-d987d2d-v2",
+  "snapshot_root": "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/pilot-snapshot-v2",
+  "status": "passed"
+}

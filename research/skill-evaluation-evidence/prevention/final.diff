@@ -1,0 +1,22 @@
+--- module.before
++++ module.py
+@@ -1,2 +1,4 @@
+-def receipt_total(prices):
+-    return sum(prices)
++def receipt_total(prices, discount_rate=0):
++    if not 0 <= discount_rate <= 1:
++        raise ValueError("discount_rate must be between 0 and 1")
++    return sum(prices) * (1 - discount_rate)
+--- test.before
++++ test_module.py
+@@ -3,4 +3,10 @@
+ class TotalTests(unittest.TestCase):
+     def test_total(self): self.assertEqual(receipt_total([10, 20]), 30)
+     def test_empty(self): self.assertEqual(receipt_total([]), 0)
++    def test_discount(self): self.assertEqual(receipt_total([10, 20], 0.1), 27)
++    def test_free(self): self.assertEqual(receipt_total([10, 20], 1), 0)
++    def test_negative_rate(self):
++        with self.assertRaises(ValueError): receipt_total([10], -0.1)
++    def test_excess_rate(self):
++        with self.assertRaises(ValueError): receipt_total([10], 1.1)
+ if __name__ == "__main__": unittest.main()

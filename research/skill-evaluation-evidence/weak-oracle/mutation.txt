@@ -1,0 +1,45 @@
+test_fraction (test_module.MultiplyTests.test_fraction) ... FAIL
+test_negative (test_module.MultiplyTests.test_negative) ... FAIL
+test_positive (test_module.MultiplyTests.test_positive) ... FAIL
+test_zero (test_module.MultiplyTests.test_zero) ... FAIL
+
+======================================================================
+FAIL: test_fraction (test_module.MultiplyTests.test_fraction)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/anti-slop-skill-evaluation/weak-oracle/test_module.py", line 7, in test_fraction
+    def test_fraction(self): self.assertEqual(multiply(0.5, 4), 2)
+                             ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 3.0 != 2
+
+======================================================================
+FAIL: test_negative (test_module.MultiplyTests.test_negative)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/anti-slop-skill-evaluation/weak-oracle/test_module.py", line 6, in test_negative
+    def test_negative(self): self.assertEqual(multiply(-2, 3), -6)
+                             ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+AssertionError: -5 != -6
+
+======================================================================
+FAIL: test_positive (test_module.MultiplyTests.test_positive)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/anti-slop-skill-evaluation/weak-oracle/test_module.py", line 4, in test_positive
+    def test_positive(self): self.assertEqual(multiply(2, 3), 6)
+                             ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 7 != 6
+
+======================================================================
+FAIL: test_zero (test_module.MultiplyTests.test_zero)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/var/home/mohamed/Documents/Codex/2026-10-04/u-w/work/anti-slop-skill-evaluation/weak-oracle/test_module.py", line 5, in test_zero
+    def test_zero(self): self.assertEqual(multiply(2, 0), 0)
+                         ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.001s
+
+FAILED (failures=4)
