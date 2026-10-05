@@ -1,0 +1,161 @@
+"""Frozen data models for the anti-slop P0 vertical slice."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Optional, Tuple
+
+
+class RunMode(str, Enum):
+    DIAGNOSE = "diagnose"
+    REFACTOR = "refactor"
+    REPAIR_SLOP = "repair-slop"
+
+
+class AttemptStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    PASSED = "passed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    BLOCKED = "blocked"
+    UNAVAILABLE = "unavailable"
+    NOT_RUN = "not-run"
+
+
+class CheckStatus(str, Enum):
+    PENDING = "pending"
+    PASSED = "passed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    BLOCKED = "blocked"
+    UNAVAILABLE = "unavailable"
+    FLAKY = "flaky"
+    NOT_RUN = "not-run"
+
+
+class FindingSeverity(str, Enum):
+    INFO = "info"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class ManifestStatus(str, Enum):
+    PASSED = "passed"
+    STOPPED = "stopped"
+    BLOCKED = "blocked"
+    FAILED = "failed"
+    FLAKY = "flaky"
+    ROLLED_BACK = "rolled_back"
+
+
+@dataclass(frozen=True)
+class CheckSpec:
+    id: str
+    argv: Tuple[str, ...]
+    cwd: str = "."
+    shell: bool = False
+    timeout_seconds: Optional[float] = None
+    required: bool = True
+    rerun: bool = False
+
+
+@dataclass(frozen=True)
+class RunSpec:
+    repo_path: str
+    snapshot_root: str
+    mode: RunMode = RunMode.DIAGNOSE
+    checks: Tuple[CheckSpec, ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True)
+class ArtifactRef:
+    path: str
+    sha256: Optional[str] = None
+    size_bytes: Optional[int] = None
+    media_type: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class CommandAttempt:
+    check_id: str
+    argv: Tuple[str, ...]
+    cwd: str
+    status: AttemptStatus
+    exit_code: Optional[int] = None
+    duration_ms: Optional[float] = None
+    stdout_artifact: Optional[ArtifactRef] = None
+    stderr_artifact: Optional[ArtifactRef] = None
+    sandboxed: bool = True
+
+
+@dataclass(frozen=True)
+class CheckRecord:
+    check_id: str
+    status: CheckStatus
+    attempts: Tuple[CommandAttempt, ...] = field(default_factory=tuple)
+    finding_ids: Tuple[str, ...] = field(default_factory=tuple)
+    required: bool = True
+
+
+@dataclass(frozen=True)
+class Finding:
+    """A finding has nine required semantic fields.
+
+    The required fields are id, title, source, evidence_refs, severity, impact,
+    confidence, recommended_action, and counterargument.  Location fields are
+    optional convenience metadata.
+    """
+
+    id: str
+    title: str
+    source: str
+    evidence_refs: Tuple[str, ...]
+    severity: FindingSeverity
+    impact: str
+    confidence: float
+    recommended_action: str
+    counterargument: str
+    path: Optional[str] = None
+    line: Optional[int] = None
+    column: Optional[int] = None
+
+    @property
+    def check_id(self) -> str:
+        """Compatibility view: a check source is the check identifier."""
+        return self.source
+
+    @property
+    def evidence(self) -> Tuple[str, ...]:
+        """Compatibility view for early Task 2 callers."""
+        return self.evidence_refs
+
+    @property
+    def message(self) -> str:
+        return self.title
+
+
+@dataclass(frozen=True)
+class DiscoveryInfo:
+    git_root: str
+    head: str
+    branch: str
+    dirty: bool
+    candidates: Tuple[str, ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True)
+class RunManifest:
+    run_id: str
+    mode: RunMode
+    repo_path: str
+    snapshot_root: str
+    status: ManifestStatus
+    checks: Tuple[CheckRecord, ...] = field(default_factory=tuple)
+    findings: Tuple[Finding, ...] = field(default_factory=tuple)
+    artifacts: Tuple[ArtifactRef, ...] = field(default_factory=tuple)
+    discovery: Optional[DiscoveryInfo] = None
+    stop_reason: Optional[str] = None
